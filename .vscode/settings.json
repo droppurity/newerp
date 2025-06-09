@@ -1,0 +1,21 @@
+{
+    "IDX.aI.enableInlineCompletion": true,
+    "IDX.aI.enableCodebaseIndexing": true,
+    "workbench.editorLargeFileConfirmation": 10,
+    "workbench.editor.autoLockGroups": {
+        "workbench.input.interactive": true,
+        "mainThreadWebview-markdown.preview": true,
+        "jupyter-notebook": true
+    },
+    "files.autoSave": "off",
+    "editor.tabSize": 9,
+    "editor.renderWhitespace": "all",
+    "editor.cursorStyle": "underline",
+    "editor.wordWrap": "on",
+    "workbench.editor.enablePreview": false,
+    "editor.accessibilityPageSize": 500,
+    "editor.autoClosingDelete": "never",
+    "editor.autoClosingOvertype": "never",
+    "editor.autoClosingQuotes": "always",
+    "editor.autoIndent": "advanced"
+}
