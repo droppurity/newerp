@@ -62,16 +62,8 @@ interface TermsAndConditionsContent {
   updatedAt?: string | Date;
 }
 
-interface StaticPlan {
-  id: string;
-  name: string;
-  price: number;
-}
+const planOptions = ["Basic Plan", "Value Plan", "Commercial Plan"];
 
-const staticPlans: StaticPlan[] = [
-  { id: 'BASIC_STATIC_PLAN', name: 'Basic Plan', price: 499 },
-  { id: 'COMMERCIAL_STATIC_PLAN', name: 'Commercial Plan', price: 999 },
-];
 
 export default function NewRegistrationPage() {
   const router = useRouter();
@@ -135,7 +127,7 @@ export default function NewRegistrationPage() {
   const [securityAmount, setSecurityAmount] = useState<string>('1500');
 
   // Plan Selected State
-  const [planSelected, setPlanSelected] = useState<string>(staticPlans[0].id); // Default to the ID of the first static plan
+  const [planSelected, setPlanSelected] = useState<string>(planOptions[0]);
 
   // Terms & Conditions
   const [termsContent, setTermsContent] = useState<TermsAndConditionsContent | null>(null);
@@ -502,7 +494,7 @@ export default function NewRegistrationPage() {
     setPaymentType('Online');
     setSecurityAmount('1500');
 
-    setPlanSelected(staticPlans[0].id); // Default to the ID of the first static plan
+    setPlanSelected(planOptions[0]);
 
     setTermsAgreed(true);
     setSavedSignature(null);
@@ -550,8 +542,7 @@ export default function NewRegistrationPage() {
     if (!savedSignature) { addAlert('destructive', 'Validation Error', 'Customer signature is required.'); return; }
 
     const receiptNo = `RCPT-${Date.now() % 1000000}`;
-    const chosenPlan = staticPlans.find(p => p.id === planSelected);
-
+    
     const registrationData = {
       receiptNumber: receiptNo,
       customerName, fatherSpouseName, customerPhone, altMobileNo, emailId,
@@ -566,9 +557,9 @@ export default function NewRegistrationPage() {
       selectedZone, selectedDivision, generatedCustomerId,
       modelInstalled, serialNumber, installationDate: installationDate ? format(installationDate, 'yyyy-MM-dd') : null, installationTime,
       tdsBefore, tdsAfter, paymentType, securityAmount,
-      planSelected: chosenPlan ? chosenPlan.id : null, 
-      planName: chosenPlan ? chosenPlan.name : 'N/A',
-      planPrice: chosenPlan ? chosenPlan.price : 0,
+      planSelected: planSelected, // The selected plan string
+      planName: planSelected,     // Using the string as plan name
+      planPrice: 0,               // Setting price to 0 as it's not defined for these static options
       termsAgreed,
       termsContentSnapshot: termsContent ? { title: termsContent.title, contentBlocks: termsContent.contentBlocks } : null,
       signatureDataUrl: savedSignature,
@@ -1163,9 +1154,9 @@ export default function NewRegistrationPage() {
                       <SelectValue placeholder="Select Plan" />
                     </SelectTrigger>
                     <SelectContent>
-                      {staticPlans.map(plan => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} (₹{plan.price})
+                      {planOptions.map(plan => (
+                        <SelectItem key={plan} value={plan}>
+                          {plan}
                         </SelectItem>
                       ))}
                     </SelectContent>
