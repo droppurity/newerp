@@ -1,14 +1,19 @@
 
 "use client";
 
+import Image from 'next/image';
+import { ExternalLink } from 'lucide-react';
+
 interface CustomerLocationProps {
   latitude: number;
   longitude: number;
-  defaultLatitude: number; // To know if we are using default or actual coordinates
+  defaultLatitude: number;
   defaultLongitude: number;
   addressQuery?: string | null;
   mapLabel?: string;
-  height?: string; // Allow custom height for the map
+  // The height prop is less directly applicable to an aspect-ratio image,
+  // but we'll keep it in case styling needs to adapt based on it elsewhere.
+  height?: string; 
 }
 
 const CustomerLocation: React.FC<CustomerLocationProps> = ({
@@ -18,53 +23,53 @@ const CustomerLocation: React.FC<CustomerLocationProps> = ({
   defaultLongitude,
   addressQuery,
   mapLabel = "Service Location",
-  height = "400px", // Default height for the map iframe
 }) => {
-  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-  let gMapsQuery: string;
+  let gMapsLink: string;
+  let gMapsQueryText: string;
 
   if (latitude !== defaultLatitude || longitude !== defaultLongitude) {
-    // If specific coordinates are provided (not default), use them
-    gMapsQuery = `${latitude},${longitude}`;
+    gMapsQueryText = `${latitude},${longitude}`;
+    gMapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
   } else if (addressQuery) {
-    // If an address query (from pincode, etc.) is provided, use that
-    gMapsQuery = addressQuery;
+    gMapsQueryText = addressQuery;
+    gMapsLink = `https://www.google.com/maps?q=${encodeURIComponent(addressQuery)}`;
   } else {
-    // Fallback to default coordinates if no specific addressQuery
-    gMapsQuery = `${defaultLatitude},${defaultLongitude}`;
+    gMapsQueryText = `${defaultLatitude},${defaultLongitude}`;
+    gMapsLink = `https://www.google.com/maps?q=${defaultLatitude},${defaultLongitude}`;
   }
 
-  const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY_HERE'}&q=${encodeURIComponent(gMapsQuery)}`;
-
-  if (!GOOGLE_MAPS_API_KEY) {
-    return (
-      <div className="w-full p-4 my-4 border border-destructive rounded-md bg-destructive/10 text-destructive-foreground text-center">
-        <p className="font-semibold">Google Maps API Key Missing</p>
-        <p className="text-sm">
-          To display the map, please obtain a Google Maps API key, enable the "Maps Embed API",
-          and add your key as <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to the <code>.env.local</code> file.
-          Then, restart your development server.
-        </p>
-        <p className="text-xs mt-2">Map query would be for: {gMapsQuery}</p>
-      </div>
-    );
-  }
+  // Using a 16:9 aspect ratio for the placeholder
+  const placeholderWidth = 800;
+  const placeholderHeight = 450;
 
   return (
-    <div className="w-full rounded-md shadow-md overflow-hidden border border-border my-4">
-      <iframe
-        width="100%"
-        style={{ border: 0, height: height }}
-        loading="lazy"
-        allowFullScreen
-        referrerPolicy="no-referrer-when-downgrade"
-        src={mapEmbedUrl}
-        title={mapLabel}
-        aria-label={mapLabel}
-      ></iframe>
-      <p className="text-xs text-muted-foreground p-2 text-center bg-background rounded-b-md">
-        Map query: <span className="font-mono text-xs">{gMapsQuery}</span>
+    <div className="my-4">
+      <div className="relative w-full aspect-w-16 aspect-h-9 rounded-md shadow-md overflow-hidden border border-border group">
+        <a
+          href={gMapsLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`View location for ${mapLabel} on Google Maps`}
+          className="block w-full h-full"
+        >
+          <Image
+            src={`https://placehold.co/${placeholderWidth}x${placeholderHeight}.png`}
+            alt={mapLabel || 'Map placeholder linking to Google Maps'}
+            layout="fill"
+            objectFit="cover"
+            className="transition-transform duration-300 group-hover:scale-105"
+            data-ai-hint="map location"
+            priority // Consider adding priority if this is above the fold
+          />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
+            <ExternalLink className="h-10 w-10 sm:h-12 sm:w-12 text-white mb-2" />
+            <p className="text-white text-center font-semibold text-sm sm:text-base">View on Google Maps</p>
+            <p className="text-white text-xs text-center mt-1 hidden sm:block">Click map to open location in a new tab.</p>
+          </div>
+        </a>
+      </div>
+      <p className="text-xs text-muted-foreground p-2 text-center bg-card rounded-b-md -mt-0 shadow-sm border border-t-0 border-border">
+        Map Location Query: <span className="font-mono text-xs">{gMapsQueryText}</span>
       </p>
     </div>
   );
