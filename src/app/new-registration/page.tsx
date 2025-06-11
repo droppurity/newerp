@@ -73,19 +73,19 @@ export default function NewRegistrationPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingId, setIsGeneratingId] = useState(false);
 
-  // Customer details state - PREFILLED
-  const [customerName, setCustomerName] = useState<string>('Test Customer');
-  const [fatherSpouseName, setFatherSpouseName] = useState<string>('Test Father');
-  const [customerPhone, setCustomerPhone] = useState<string>('1234567890');
-  const [altMobileNo, setAltMobileNo] = useState<string>('0987654321');
-  const [emailId, setEmailId] = useState<string>('test@example.com');
+  // Customer details state
+  const [customerName, setCustomerName] = useState<string>('');
+  const [fatherSpouseName, setFatherSpouseName] = useState<string>('');
+  const [customerPhone, setCustomerPhone] = useState<string>('');
+  const [altMobileNo, setAltMobileNo] = useState<string>('');
+  const [emailId, setEmailId] = useState<string>('');
 
   const [customerPhotoFile, setCustomerPhotoFile] = useState<File | null>(null);
   const [customerPhotoDataUrl, setCustomerPhotoDataUrl] = useState<string | null>(null);
-  // Address details state - PREFILLED
-  const [customerAddress, setCustomerAddress] = useState<string>('123 Test Street, Test Area');
-  const [landmark, setLandmark] = useState<string>('Near Test Park');
-  const [pincode, setPincode] = useState<string>('834001'); // Example Pincode for Ranchi, Jharkhand
+  // Address details state
+  const [customerAddress, setCustomerAddress] = useState<string>('');
+  const [landmark, setLandmark] = useState<string>('');
+  const [pincode, setPincode] = useState<string>('');
   const [city, setCity] = useState<string>('');
   const [stateName, setStateName] = useState<string>('');
   const [country, setCountry] = useState<string>('');
@@ -101,8 +101,8 @@ export default function NewRegistrationPage() {
   const [generatedMapLink, setGeneratedMapLink] = useState<string>('');
   const [confirmedMapLink, setConfirmedMapLink] = useState<string | null>(null);
 
-  // Identity Verification - PREFILLED
-  const [aadhaarNo, setAadhaarNo] = useState<string>('123456789012');
+  // Identity Verification
+  const [aadhaarNo, setAadhaarNo] = useState<string>('');
   const [aadhaarFrontFile, setAadhaarFrontFile] = useState<File | null>(null);
   const [aadhaarBackFile, setAadhaarBackFile] = useState<File | null>(null);
   const [aadhaarFrontDataUrl, setAadhaarFrontDataUrl] = useState<string | null>(null);
@@ -110,21 +110,21 @@ export default function NewRegistrationPage() {
 
   // Administrative Details
   const [currentSampleZones, setCurrentSampleZones] = useState(initialSampleZones);
-  const [selectedZone, setSelectedZone] = useState<string>('JH09');
+  const [selectedZone, setSelectedZone] = useState<string>(initialSampleZones.length > 0 ? initialSampleZones[0].value : '');
   const [filteredZones, setFilteredZones] = useState(initialSampleZones);
   const [zonePlaceholder, setZonePlaceholder] = useState<string>("Select Zone");
   const [selectedDivision, setSelectedDivision] = useState<string>('');
   const [generatedCustomerId, setGeneratedCustomerId] = useState<string>('');
 
-  // Installation & Plan Details - PREFILLED
-  const [modelInstalled, setModelInstalled] = useState<string>('Alpha');
-  const [serialNumber, setSerialNumber] = useState<string>('SN12345ALPHA');
+  // Installation & Plan Details
+  const [modelInstalled, setModelInstalled] = useState<string>('');
+  const [serialNumber, setSerialNumber] = useState<string>('');
   const [installationDate, setInstallationDate] = useState<Date | undefined>(new Date());
   const [installationTime, setInstallationTime] = useState<string>('10:00');
-  const [tdsBefore, setTdsBefore] = useState<string>('350');
-  const [tdsAfter, setTdsAfter] = useState<string>('50');
+  const [tdsBefore, setTdsBefore] = useState<string>('');
+  const [tdsAfter, setTdsAfter] = useState<string>('');
   const [paymentType, setPaymentType] = useState<string>('Online');
-  const [securityAmount, setSecurityAmount] = useState<string>('1500');
+  const [securityAmount, setSecurityAmount] = useState<string>('');
 
   // Plan Selected State
   const [planSelected, setPlanSelected] = useState<string>(planOptions[0]);
@@ -133,7 +133,7 @@ export default function NewRegistrationPage() {
   const [termsContent, setTermsContent] = useState<TermsAndConditionsContent | null>(null);
   const [isLoadingTerms, setIsLoadingTerms] = useState<boolean>(true);
   const [termsFetchError, setTermsFetchError] = useState<string | null>(null);
-  const [termsAgreed, setTermsAgreed] = useState<boolean>(true);
+  const [termsAgreed, setTermsAgreed] = useState<boolean>(false);
 
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
 
@@ -194,9 +194,7 @@ export default function NewRegistrationPage() {
         router.replace('/login');
       } else {
         setIsAuthenticating(false);
-        if (pincode.length === 6) {
-          handlePincodeChange({ target: { value: pincode } } as React.ChangeEvent<HTMLInputElement>);
-        }
+        // No auto pincode fetch on load if pincode starts empty
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -444,18 +442,18 @@ export default function NewRegistrationPage() {
   };
 
   const resetFormFieldsAndReceipt = () => {
-    setCustomerName('Test Customer');
-    setFatherSpouseName('Test Father');
-    setCustomerPhone('1234567890');
-    setAltMobileNo('0987654321');
-    setEmailId('test@example.com');
+    setCustomerName('');
+    setFatherSpouseName('');
+    setCustomerPhone('');
+    setAltMobileNo('');
+    setEmailId('');
     const customerPhotoInput = document.getElementById('customerPhotoFile') as HTMLInputElement | null;
     if (customerPhotoInput) customerPhotoInput.value = "";
     setCustomerPhotoFile(null);
     setCustomerPhotoDataUrl(null);
-    setCustomerAddress('123 Test Street, Test Area');
-    setLandmark('Near Test Park');
-    setPincode('834001');
+    setCustomerAddress('');
+    setLandmark('');
+    setPincode('');
     setCity('');
     setStateName('');
     setCountry('');
@@ -467,7 +465,7 @@ export default function NewRegistrationPage() {
     setGeneratedMapLink('');
     setConfirmedMapLink(null);
 
-    setAadhaarNo('123456789012');
+    setAadhaarNo('');
     const aadhaarFrontInput = document.getElementById('aadhaarFrontFile') as HTMLInputElement | null;
     if (aadhaarFrontInput) aadhaarFrontInput.value = "";
     setAadhaarFrontFile(null);
@@ -477,26 +475,23 @@ export default function NewRegistrationPage() {
     setAadhaarBackFile(null);
     setAadhaarBackDataUrl(null);
 
-    setSelectedZone('JH09');
-    setSelectedDivision(''); // Will be set by pincode change
-    if (pincode.length === 6) { // Re-trigger pincode logic if it was prefilled
-        handlePincodeChange({ target: { value: pincode } } as React.ChangeEvent<HTMLInputElement>);
-    }
+    setSelectedZone(initialSampleZones.length > 0 ? initialSampleZones[0].value : '');
+    setSelectedDivision(''); 
     setGeneratedCustomerId('');
     updateFilteredZones(null, currentSampleZones);
 
-    setModelInstalled('Alpha');
-    setSerialNumber('SN12345ALPHA');
+    setModelInstalled('');
+    setSerialNumber('');
     setInstallationDate(new Date());
     setInstallationTime('10:00');
-    setTdsBefore('350');
-    setTdsAfter('50');
+    setTdsBefore('');
+    setTdsAfter('');
     setPaymentType('Online');
-    setSecurityAmount('1500');
+    setSecurityAmount('');
 
     setPlanSelected(planOptions[0]);
 
-    setTermsAgreed(true);
+    setTermsAgreed(false);
     setSavedSignature(null);
 
     if (typeof (window as any).customerSignatureClear === 'function') {
@@ -557,9 +552,9 @@ export default function NewRegistrationPage() {
       selectedZone, selectedDivision, generatedCustomerId,
       modelInstalled, serialNumber, installationDate: installationDate ? format(installationDate, 'yyyy-MM-dd') : null, installationTime,
       tdsBefore, tdsAfter, paymentType, securityAmount,
-      planSelected: planSelected, // The selected plan string
-      planName: planSelected,     // Using the string as plan name
-      planPrice: 0,               // Setting price to 0 as it's not defined for these static options
+      planSelected: planSelected,
+      planName: planSelected,     
+      planPrice: 0,               
       termsAgreed,
       termsContentSnapshot: termsContent ? { title: termsContent.title, contentBlocks: termsContent.contentBlocks } : null,
       signatureDataUrl: savedSignature,
@@ -1534,5 +1529,3 @@ export default function NewRegistrationPage() {
     </div>
   );
 }
-
-    

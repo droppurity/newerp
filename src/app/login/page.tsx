@@ -45,7 +45,7 @@ export default function LoginPage() {
         title: "Login Successful",
         description: "Redirecting to dashboard...",
       });
-      router.push('/'); 
+      router.push('/');
     } else {
       console.log('Login failed for:', { email });
       setError('Invalid email or password.');
@@ -69,17 +69,17 @@ export default function LoginPage() {
             <LogInIcon className="mr-2 h-7 w-7" /> Login
           </CardTitle>
           <CardDescription className="text-md pt-1">
-            Access your DropPurity dashboard. Use '9835397924' for email and '6203739882' for password.
+            Access your DropPurity dashboard.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email (use 9835397924)</Label>
+              <Label htmlFor="email">Username</Label>
               <Input
                 id="email"
-                type="text" // Changed to text to allow numbers, but still labeled as email for now
-                placeholder="9835397924"
+                type="text"
+                placeholder="Enter your username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -87,7 +87,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password (use 6203739882)</Label>
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
