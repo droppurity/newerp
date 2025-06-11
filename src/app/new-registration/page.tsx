@@ -62,6 +62,17 @@ interface TermsAndConditionsContent {
   updatedAt?: string | Date;
 }
 
+interface StaticPlan {
+  id: string;
+  name: string;
+  price: number;
+}
+
+const staticPlans: StaticPlan[] = [
+  { id: 'BASIC_STATIC_PLAN', name: 'Basic Plan', price: 499 },
+  { id: 'COMMERCIAL_STATIC_PLAN', name: 'Commercial Plan', price: 999 },
+];
+
 export default function NewRegistrationPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -124,7 +135,7 @@ export default function NewRegistrationPage() {
   const [securityAmount, setSecurityAmount] = useState<string>('1500');
 
   // Plan Selected State
-  const [planSelected, setPlanSelected] = useState<string>('Basic'); // Default to Basic
+  const [planSelected, setPlanSelected] = useState<string>(staticPlans[0].id); // Default to the ID of the first static plan
 
   // Terms & Conditions
   const [termsContent, setTermsContent] = useState<TermsAndConditionsContent | null>(null);
@@ -491,7 +502,7 @@ export default function NewRegistrationPage() {
     setPaymentType('Online');
     setSecurityAmount('1500');
 
-    setPlanSelected('Basic'); // Default to Basic
+    setPlanSelected(staticPlans[0].id); // Default to the ID of the first static plan
 
     setTermsAgreed(true);
     setSavedSignature(null);
@@ -539,6 +550,7 @@ export default function NewRegistrationPage() {
     if (!savedSignature) { addAlert('destructive', 'Validation Error', 'Customer signature is required.'); return; }
 
     const receiptNo = `RCPT-${Date.now() % 1000000}`;
+    const chosenPlan = staticPlans.find(p => p.id === planSelected);
 
     const registrationData = {
       receiptNumber: receiptNo,
@@ -554,9 +566,9 @@ export default function NewRegistrationPage() {
       selectedZone, selectedDivision, generatedCustomerId,
       modelInstalled, serialNumber, installationDate: installationDate ? format(installationDate, 'yyyy-MM-dd') : null, installationTime,
       tdsBefore, tdsAfter, paymentType, securityAmount,
-      planSelected, // This will be "Basic" or "Commercial"
-      planName: planSelected, // Use the selected value as the name
-      planPrice: 0, // Set price to 0 for static plans
+      planSelected: chosenPlan ? chosenPlan.id : null, 
+      planName: chosenPlan ? chosenPlan.name : 'N/A',
+      planPrice: chosenPlan ? chosenPlan.price : 0,
       termsAgreed,
       termsContentSnapshot: termsContent ? { title: termsContent.title, contentBlocks: termsContent.contentBlocks } : null,
       signatureDataUrl: savedSignature,
@@ -755,7 +767,7 @@ export default function NewRegistrationPage() {
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write('<html><head><title>Print Receipt</title>');
-
+        
         const styles =
           '<style>' +
             "body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; color: #333; font-size: 12px; line-height: 1.6; }" +
@@ -1151,8 +1163,11 @@ export default function NewRegistrationPage() {
                       <SelectValue placeholder="Select Plan" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Basic">Basic Plan</SelectItem>
-                      <SelectItem value="Commercial">Commercial Plan</SelectItem>
+                      {staticPlans.map(plan => (
+                        <SelectItem key={plan.id} value={plan.id}>
+                          {plan.name} (₹{plan.price})
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1393,7 +1408,7 @@ export default function NewRegistrationPage() {
                       </tr>
                       <tr className="border-b border-border">
                         <td className="py-2 px-3">Plan Selected</td>
-                        <td className="py-2 px-3">{lastSuccessfulRegistrationData.planName || lastSuccessfulRegistrationData.planSelected}</td>
+                        <td className="py-2 px-3">{lastSuccessfulRegistrationData.planName}</td>
                         <td className="py-2 px-3 amount-col">{parseFloat(lastSuccessfulRegistrationData.planPrice || '0').toFixed(2)}</td>
                       </tr>
                        <tr className="border-b border-border">
@@ -1475,10 +1490,10 @@ export default function NewRegistrationPage() {
 \nYour User ID: ${lastSuccessfulRegistrationData.generatedCustomerId}
 \nRegistration Summary:
 \nModel Installed: ${lastSuccessfulRegistrationData.modelInstalled}
-\nPlan Selected: ${lastSuccessfulRegistrationData.planName || lastSuccessfulRegistrationData.planSelected}
+\nPlan Selected: ${lastSuccessfulRegistrationData.planName}
 \nTotal Amount Paid: Rs ${(parseFloat(lastSuccessfulRegistrationData.securityAmount || '0') + parseFloat(lastSuccessfulRegistrationData.planPrice || '0')).toFixed(2)}
 \n
-\nYour Receipt Link: ${receiptDriveLink}
+\nYour Receipt Link: ${receiptDriveLink || 'Not available yet, please save to Drive first.'}
 \n
 \nThank you for choosing DropPurity!
 `;
@@ -1489,6 +1504,7 @@ export default function NewRegistrationPage() {
                     const whatsappUrl = `https://${whatsappBaseUrl}/?phone=${internationalPhoneNumber}&text=${encodeURIComponent(message)}`;
                     window.open(whatsappUrl, '_blank');
                   }}
+                  disabled={!receiptDriveLink}
                 >
                   <MessageCircle className="mr-2 h-4 w-4" />
                   Share on WhatsApp
@@ -1502,7 +1518,7 @@ export default function NewRegistrationPage() {
                   disabled={isSavingReceiptToDrive}
                 >
                   {isSavingReceiptToDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                  {isSavingReceiptToDrive ? 'Saving to Drive...' : 'Save to Drive'}
+                  {isSavingReceiptToDrive ? 'Saving to Drive...' : (receiptDriveLink ? 'Re-Save to Drive' : 'Save to Drive')}
                 </Button>
               </div>
               <Button onClick={resetFormFieldsAndReceipt}>
@@ -1512,7 +1528,9 @@ export default function NewRegistrationPage() {
             {receiptDriveLink && (
               <div className="print-hidden p-4 text-center text-sm text-muted-foreground">
                 <p>Receipt saved to Google Drive.
-                  The link provided previously was to the actual file, please check your Google Drive.
+                  <a href={receiptDriveLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
+                    View Saved Receipt
+                  </a>
                 </p>
               </div>
             )}
@@ -1525,3 +1543,5 @@ export default function NewRegistrationPage() {
     </div>
   );
 }
+
+    
