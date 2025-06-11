@@ -107,10 +107,8 @@ export default function DropPurityPage() {
         let errorDetails = `Network response was not ok. Status: ${response.status}`;
         try {
           const errorData = await response.json();
-          // Prioritize details field, then message, then stringify the whole error data
           errorDetails = errorData.details || errorData.message || JSON.stringify(errorData);
         } catch (e) {
-          // Response body might not be JSON, use the status text
           errorDetails = `Network response was not ok. Status: ${response.status} ${response.statusText}`;
         }
         throw new Error(`Failed to fetch customers for plan expiry checks: ${errorDetails}`);
@@ -309,7 +307,11 @@ export default function DropPurityPage() {
                               <ExternalLink className="ml-0.5 h-2.5 w-2.5" />
                             </a>
                           )}
-                          <span className="flex items-center"><Phone className="mr-1 h-3 w-3" /> {notif.phone}</span>
+                          {notif.phone && (
+                            <a href={`tel:${notif.phone}`} className="flex items-center text-primary hover:underline">
+                              <Phone className="mr-1 h-3 w-3" /> {notif.phone}
+                            </a>
+                          )}
                           <Button 
                               variant="outline" 
                               size="sm" 
@@ -361,7 +363,11 @@ export default function DropPurityPage() {
                            Plan "{notif.planName}" expiring: {notif.remainingDaysText}
                         </p>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground items-center mt-1.5">
-                          <span className="flex items-center"><Phone className="mr-1 h-3 w-3" /> {notif.customerPhone}</span>
+                          {notif.customerPhone && (
+                            <a href={`tel:${notif.customerPhone}`} className="flex items-center text-primary hover:underline">
+                              <Phone className="mr-1 h-3 w-3" /> {notif.customerPhone}
+                            </a>
+                          )}
                            <Button 
                               variant="outline" 
                               size="sm" 
@@ -399,4 +405,3 @@ export default function DropPurityPage() {
     </div>
   );
 }
-

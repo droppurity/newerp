@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from '@/components/ui/button';
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
-  AlertCircle, User, MapPin, Phone, Mail, Home, Briefcase, Droplet,
+  AlertCircle, User, MapPin, Phone as PhoneIcon, Mail, Home, Briefcase, Droplet,
   FileText, CalendarDays, Clock, Tag, ShieldCheck, BarChart3, Users,
   Building, Hash, CircleDollarSign, Wrench, Receipt, LogOut, ArrowLeft, LinkIcon, ExternalLink, Droplets as AppIcon
 } from 'lucide-react';
@@ -59,11 +59,12 @@ interface DetailItemProps {
   isDate?: boolean;
   isBoolean?: boolean;
   isCurrency?: boolean;
+  isTel?: boolean;
   currencySymbol?: string;
   children?: React.ReactNode;
 }
 
-const DetailItem: React.FC<DetailItemProps> = ({ icon: Icon, label, value, isLink, isDate, isBoolean, isCurrency, currencySymbol = '₹', children }) => {
+const DetailItem: React.FC<DetailItemProps> = ({ icon: Icon, label, value, isLink, isDate, isBoolean, isCurrency, isTel, currencySymbol = '₹', children }) => {
   let displayValue: React.ReactNode = <span className="text-muted-foreground/80">N/A</span>;
 
   if (children) {
@@ -75,6 +76,13 @@ const DetailItem: React.FC<DetailItemProps> = ({ icon: Icon, label, value, isLin
       displayValue = (
         <a href={value.startsWith('http') ? value : `https://${value}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 break-all">
           View Link <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+        </a>
+      );
+    } else if (isTel && typeof value === 'string') {
+      displayValue = (
+        <a href={`tel:${value}`} className="text-primary hover:underline flex items-center gap-1">
+          {Icon && <Icon className="h-4 w-4 mr-0 text-primary/80 shrink-0 invisible" /> /* Placeholder for alignment if icon is passed */}
+          {value}
         </a>
       );
     } else if (isDate && typeof value === 'string') {
@@ -261,8 +269,8 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                 <DetailItem icon={User} label="Full Name" value={customer.customerName} />
                 <DetailItem icon={Users} label="Father/Spouse Name" value={customer.fatherSpouseName} />
-                <DetailItem icon={Phone} label="Primary Phone" value={customer.customerPhone} />
-                <DetailItem icon={Phone} label="Alternate Phone" value={customer.altMobileNo} />
+                <DetailItem icon={PhoneIcon} label="Primary Phone" value={customer.customerPhone} isTel />
+                <DetailItem icon={PhoneIcon} label="Alternate Phone" value={customer.altMobileNo} isTel />
                 <DetailItem icon={Mail} label="Email ID" value={customer.emailId} />
                 <DetailItem icon={Hash} label="Aadhaar No." value={customer.aadhaarNo} />
               </div>

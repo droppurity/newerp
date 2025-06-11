@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import { 
   Droplets, LogOut, LayoutDashboard, WrenchIcon, Search as SearchIcon, 
-  User, Phone, MapPin, StickyNote, Loader2, AlertCircle, ExternalLink, Users as UsersIcon,
+  User, Phone as PhoneIcon, MapPin, StickyNote, Loader2, AlertCircle, ExternalLink, Users as UsersIcon,
   ListChecks, CheckSquare, History
 } from 'lucide-react';
 
@@ -235,21 +235,19 @@ export default function ServiceManagementPage() {
             } catch (error) {
               console.error("Error parsing service notifications from localStorage on job resolve:", error);
               toast({ variant: "destructive", title: "Local Storage Error", description: "Could not read existing notifications. Clearing invalid data." });
-              // If parsing fails, clear localStorage to prevent future errors with this data
               localStorage.removeItem('newServiceJobNotifications'); 
               existingNotifications = [];
             }
           }
           const updatedNotifications = existingNotifications.map(notif => {
             if (notif.id === jobId) {
-              return { ...notif, status: 'Resolved' as 'Resolved' }; // Mark as resolved
+              return { ...notif, status: 'Resolved' as 'Resolved' }; 
             }
             return notif;
           });
 
           try {
             localStorage.setItem('newServiceJobNotifications', JSON.stringify(updatedNotifications));
-             // Dispatch custom event to notify other components (like the dashboard)
              window.dispatchEvent(new CustomEvent('localStorageChange', { detail: { key: 'newServiceJobNotifications' } }));
           } catch (error) {
              console.error("Error writing updated service notifications to localStorage:", error);
@@ -307,7 +305,7 @@ export default function ServiceManagementPage() {
                 phone: selectedCustomer.customerPhone || 'N/A',
                 problem: problemDescription.trim(),
                 createdAt: new Date().toISOString(),
-                status: 'Open', // New notifications are 'Open'
+                status: 'Open', 
             };
             const existingNotificationsRaw = localStorage.getItem('newServiceJobNotifications');
             let existingNotifications: ServiceJobNotification[] = [];
@@ -399,10 +397,15 @@ export default function ServiceManagementPage() {
                   <TableCell>
                     <div className="font-medium">{job.customerName || 'N/A'}</div>
                     <div className="text-xs text-muted-foreground">{job.customerGeneratedId || 'N/A'}</div>
+                    {job.customerPhone && (
+                        <a href={`tel:${job.customerPhone}`} className="text-xs text-primary hover:underline flex items-center gap-1 mt-0.5">
+                            <PhoneIcon className="h-3 w-3 shrink-0"/> {job.customerPhone}
+                        </a>
+                    )}
                   </TableCell>
                   <TableCell className="max-w-xs truncate" title={job.problemDescription}>{job.problemDescription}</TableCell>
                   {!showResolveButton && <TableCell>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${job.status === "Open" ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${job.status === "Open" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300" : "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"}`}>
                         {job.status}
                     </span>
                   </TableCell>}
@@ -515,7 +518,15 @@ export default function ServiceManagementPage() {
                         onClick={() => handleSelectCustomer(cust)}
                       >
                         <p className="font-medium text-primary-foreground">{cust.customerName} <span className="text-xs text-muted-foreground">({cust.generatedCustomerId})</span></p>
-                        <p className="text-sm text-muted-foreground">{cust.customerPhone} - {cust.city}, {cust.stateName}</p>
+                        <p className="text-sm text-muted-foreground">
+                        {cust.customerPhone ? (
+                            <a href={`tel:${cust.customerPhone}`} className="text-primary hover:underline inline-flex items-center gap-1">
+                                <PhoneIcon className="h-3.5 w-3.5 shrink-0"/>{cust.customerPhone}
+                            </a>
+                            ) : 'N/A'}
+                            {cust.customerPhone && (cust.city || cust.stateName) ? ' - ' : ''}
+                            {cust.city}{cust.city && cust.stateName ? ', ' : ''}{cust.stateName}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -534,7 +545,11 @@ export default function ServiceManagementPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <p><strong className="text-foreground/80">Name:</strong> {selectedCustomer.customerName}</p>
                   <p><strong className="text-foreground/80">Customer ID:</strong> {selectedCustomer.generatedCustomerId}</p>
-                  <p><strong className="text-foreground/80">Phone:</strong> {selectedCustomer.customerPhone}</p>
+                  <p><strong className="text-foreground/80">Phone:</strong> 
+                    {selectedCustomer.customerPhone ? (
+                      <a href={`tel:${selectedCustomer.customerPhone}`} className="ml-1 text-primary hover:underline">{selectedCustomer.customerPhone}</a>
+                    ) : ' N/A'}
+                  </p>
                   <p className="md:col-span-2"><strong className="text-foreground/80">Address:</strong> {`${selectedCustomer.customerAddress || ''}${selectedCustomer.customerAddress && (selectedCustomer.city || selectedCustomer.stateName || selectedCustomer.pincode) ? ', ' : ''}${selectedCustomer.city || ''}${selectedCustomer.city && (selectedCustomer.stateName || selectedCustomer.pincode) ? ', ' : ''}${selectedCustomer.stateName || ''}${selectedCustomer.stateName && selectedCustomer.pincode ? ' - ' : ''}${selectedCustomer.pincode || ''}`.trim().replace(/^,|,$/g, '') || 'N/A'}</p>
                   {selectedCustomer.confirmedMapLink && (
                     <p className="md:col-span-2">
@@ -605,4 +620,3 @@ export default function ServiceManagementPage() {
     </div>
   );
 }
-

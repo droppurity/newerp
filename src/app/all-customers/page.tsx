@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Droplets, LogOut, LayoutDashboard, Users, Search as SearchIcon, Loader2, AlertCircle, ExternalLink, MapPin, CalendarClock } from 'lucide-react';
+import { Droplets, LogOut, LayoutDashboard, Users, Search as SearchIcon, Loader2, AlertCircle, ExternalLink, MapPin, CalendarClock, Phone as PhoneIcon } from 'lucide-react';
 
 const isAuthenticatedClientSide = () => {
   if (typeof window !== "undefined") {
@@ -255,7 +255,14 @@ export default function AllCustomersPage() {
                         <TableRow key={customer._id}>
                           <TableCell className="font-medium">{customer.generatedCustomerId || 'N/A'}</TableCell>
                           <TableCell>{customer.customerName || 'N/A'}</TableCell>
-                          <TableCell>{customer.customerPhone || 'N/A'}</TableCell>
+                          <TableCell>
+                            {customer.customerPhone ? (
+                              <a href={`tel:${customer.customerPhone}`} className="text-primary hover:underline flex items-center gap-1">
+                                <PhoneIcon className="h-3.5 w-3.5 shrink-0"/>
+                                {customer.customerPhone}
+                              </a>
+                            ) : 'N/A'}
+                          </TableCell>
                           <TableCell 
                             className={cn(
                               "text-center font-medium",
