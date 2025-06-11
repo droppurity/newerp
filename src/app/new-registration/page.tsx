@@ -39,8 +39,8 @@ const isAuthenticatedClientSide = () => {
   return false;
 };
 
-const DEFAULT_LATITUDE = 23.3441; 
-const DEFAULT_LONGITUDE = 85.3096; 
+const DEFAULT_LATITUDE = 23.3441;
+const DEFAULT_LONGITUDE = 85.3096;
 
 const initialSampleZones = [
   { value: "JH09", label: "JH09", stateNameMatch: "Jharkhand" },
@@ -65,7 +65,7 @@ interface PlanFromAPI {
   planName: string;
   price: number;
   durationDays: number;
-  espCycleMaxHours?: number; // Optional, but good to show if available
+  espCycleMaxHours?: number;
   dailyWaterLimitLiters?: number;
 }
 
@@ -125,11 +125,11 @@ export default function NewRegistrationPage() {
   const [paymentType, setPaymentType] = useState<string>('Online');
   const [securityAmount, setSecurityAmount] = useState<string>('');
 
-  // Plan Selected State
   const [plansList, setPlansList] = useState<PlanFromAPI[]>([]);
   const [isLoadingPlans, setIsLoadingPlans] = useState<boolean>(true);
   const [planFetchError, setPlanFetchError] = useState<string | null>(null);
-  const [planSelected, setPlanSelected] = useState<string>(''); // Stores planId
+  const [planSelected, setPlanSelected] = useState<string>(''); // Will store planId
+
 
   const [termsContent, setTermsContent] = useState<TermsAndConditionsContent | null>(null);
   const [isLoadingTerms, setIsLoadingTerms] = useState<boolean>(true);
@@ -164,8 +164,8 @@ export default function NewRegistrationPage() {
     }
   }, [router, isClient]);
 
-  // Fetch Plans
-   useEffect(() => {
+
+  useEffect(() => {
     if (isClient && !isAuthenticating) {
       const fetchPlans = async () => {
         setIsLoadingPlans(true);
@@ -179,16 +179,16 @@ export default function NewRegistrationPage() {
           const data = await response.json();
           if (data.success && Array.isArray(data.plans)) {
             setPlansList(data.plans);
-            if (data.plans.length === 0) {
-               setPlanFetchError("No plans found in the database. Please ensure plans are initialized (visit /api/initialize-collections).");
+             if (data.plans.length === 0) {
+               setPlanFetchError("No plans found. Try initializing collections: /api/initialize-collections");
             }
           } else {
-            setPlanFetchError(data.message || 'Invalid plans data format received.');
+            throw new Error(data.message || 'Invalid plans data format from /api/plans.');
           }
         } catch (error: any) {
           console.error("Error fetching plans:", error);
-          setPlanFetchError(error.message || "Could not retrieve service plans.");
-          setPlansList([]); 
+          setPlanFetchError(error.message || "Could not retrieve plans. Please try again later.");
+          setPlansList([]); // Set to empty array on error
         } finally {
           setIsLoadingPlans(false);
         }
@@ -196,7 +196,6 @@ export default function NewRegistrationPage() {
       fetchPlans();
     }
   }, [isClient, isAuthenticating]);
-
 
   useEffect(() => {
     if (isClient) {
@@ -492,15 +491,13 @@ export default function NewRegistrationPage() {
     if (!installationDate) { addAlert('destructive', 'Validation Error', 'Installation Date is required.'); return; }
     if (!paymentType) { addAlert('destructive', 'Validation Error', 'Payment Type is required.'); return; }
     if (!securityAmount.trim()) { addAlert('destructive', 'Validation Error', 'Security Amount is required.'); return; }
-    if (!planSelected) { addAlert('destructive', 'Validation Error', 'Plan Selected is required.'); return; } // planSelected is planId
+    if (!planSelected) { addAlert('destructive', 'Validation Error', 'Plan Selected is required (choose a plan ID).'); return; }
     if (!termsAgreed) { addAlert('destructive', 'Validation Error', 'You must agree to the Terms & Conditions.'); return; }
     if (!savedSignature) { addAlert('destructive', 'Validation Error', 'Customer signature is required.'); return; }
 
-    const selectedPlanDetails = plansList.find(p => p.planId === planSelected);
-    if (!selectedPlanDetails) { addAlert('destructive', 'Plan Error', 'Selected plan details not found.'); return; }
-
     const receiptNo = `RCPT-${Date.now() % 1000000}`;
-    
+    const selectedPlanDetails = plansList.find(p => p.planId === planSelected);
+
     const registrationData = {
       receiptNumber: receiptNo,
       customerName, fatherSpouseName, customerPhone, altMobileNo, emailId,
@@ -514,6 +511,8 @@ export default function NewRegistrationPage() {
       modelInstalled, serialNumber, installationDate: installationDate ? format(installationDate, 'yyyy-MM-dd') : null, installationTime,
       tdsBefore, tdsAfter, paymentType, securityAmount,
       planSelected: planSelected, // This is the planId
+      planName: selectedPlanDetails?.planName || 'N/A',
+      planPrice: selectedPlanDetails?.price || 0,
       termsAgreed,
       termsContentSnapshot: termsContent ? { title: termsContent.title, contentBlocks: termsContent.contentBlocks } : null,
       signatureDataUrl: savedSignature,
@@ -531,13 +530,12 @@ export default function NewRegistrationPage() {
       setIsSubmitting(false);
       if (response.ok && result.success) {
         addAlert('default', 'Registration Successful!', `Customer ${registrationData.customerName} registered. Receipt No: ${receiptNo}`);
-        // Prepare data for receipt display and PDF generation
         const fullReceiptData = {
             ...registrationData,
-            planName: selectedPlanDetails.planName,
-            planPrice: selectedPlanDetails.price,
-            planDurationDays: selectedPlanDetails.durationDays,
-            installationDate: registrationData.installationDate, // Already formatted or null
+            planName: selectedPlanDetails?.planName || 'N/A',
+            planPrice: selectedPlanDetails?.price || 0,
+            planDurationDays: selectedPlanDetails?.durationDays || 0,
+            installationDate: registrationData.installationDate,
         };
         setLastSuccessfulRegistrationData(fullReceiptData);
         setShowReceipt(true);
@@ -589,16 +587,22 @@ export default function NewRegistrationPage() {
   const handleDeleteZone = () => { /* ... (keep existing logic) ... */ };
   const handlePrintReceipt = () => { /* ... (keep existing logic as it was) ... */ };
 
+
   if (!isClient || isAuthenticating) {
-    return ( /* ... loading spinner ... */ );
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center">
+          <Droplets className="h-12 w-12 text-primary animate-pulse mb-4" />
+          <p className="text-lg text-muted-foreground">Loading Registration Form...</p>
+        </div>
+      </div>
+    );
   }
 
   const isFetchingAnyLocation = isFetchingPincodeLocation || isFetchingGeoLocation;
   const canGenerateId = !!selectedZone && !!selectedDivision && selectedDivision.length === 3 && !isGeneratingId;
-  const isFormSubmittable = !isFetchingAnyLocation && !isSubmitting && !isLoadingTerms && !isLoadingPlans && !isGeneratingId && !!planSelected;
+  const isFormSubmittable = !isFetchingAnyLocation && !isSubmitting && !isLoadingTerms && !isGeneratingId && !!planSelected;
 
-
-  // Render component
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-muted/10">
       {/* Header */}
@@ -632,7 +636,6 @@ export default function NewRegistrationPage() {
             <CardDescription>Enter all details for new customer onboarding.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-8 p-6">
-            {/* ... (rest of the form sections: Customer, Address, Map, Identity, Admin, Customer ID Gen) ... */}
             {/* Customer Details */}
             <section>
               <h3 className="text-lg font-medium mb-4 flex items-center text-foreground/90">
@@ -832,31 +835,24 @@ export default function NewRegistrationPage() {
                 </div>
                 <div>
                   <Label htmlFor="planSelected" className="flex items-center"><ListChecks className="inline-block mr-1.5 h-4 w-4 text-primary/70" />Plan Selected</Label>
-                   {isLoadingPlans ? (
-                     <div className="flex items-center text-muted-foreground p-2 border rounded-md bg-background h-10">
-                       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading plans...
-                     </div>
-                   ) : planFetchError ? (
-                      <Alert variant="destructive" className="mt-2">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Plan Loading Error</AlertTitle>
-                        <AlertDescription>{planFetchError} <Button variant="link" asChild className="p-0 h-auto font-medium text-destructive hover:underline block mt-1"><Link href="/api/initialize-collections" target="_blank">Try Initializing Collections</Link></Button></AlertDescription>
-                      </Alert>
-                   ) : plansList.length === 0 ? (
-                      <p className="text-sm text-muted-foreground p-2 border rounded-md bg-background h-10 flex items-center">No plans available.</p>
-                   ) : (
-                    <Select value={planSelected} onValueChange={setPlanSelected}>
-                      <SelectTrigger id="planSelected"><SelectValue placeholder="Select Plan" /></SelectTrigger>
+                    <Select value={planSelected} onValueChange={setPlanSelected} disabled={isLoadingPlans || !!planFetchError || plansList.length === 0}>
+                      <SelectTrigger id="planSelected">
+                        <SelectValue placeholder={
+                          isLoadingPlans ? "Loading plans..." : 
+                          planFetchError ? "Error loading plans" :
+                          plansList.length === 0 ? "No plans available" :
+                          "Select Plan"
+                        } />
+                      </SelectTrigger>
                       <SelectContent>
                         {plansList.map(plan => (
                           <SelectItem key={plan.planId} value={plan.planId}>
-                            {plan.planName} - ₹{plan.price} ({plan.durationDays} days
-                            {plan.espCycleMaxHours ? `, ${plan.espCycleMaxHours}hrs` : ''})
+                            {plan.planName} - ₹{plan.price} ({plan.durationDays} days{plan.espCycleMaxHours ? `, ${plan.espCycleMaxHours}hrs` : ''})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                   )}
+                    {planFetchError && <p className="text-xs text-destructive mt-1">{planFetchError}</p>}
                 </div>
               </div>
             </section>
@@ -894,15 +890,116 @@ export default function NewRegistrationPage() {
           </CardContent>
           <CardFooter className="p-6 border-t bg-card flex flex-col items-stretch gap-4">
             <Button onClick={handleFormSubmitAttempt} className="w-full font-semibold text-lg py-3" size="lg" disabled={!isFormSubmittable}>
-              {(isSubmitting || isLoadingTerms || isLoadingPlans || isGeneratingId || isFetchingAnyLocation) && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-              {isSubmitting ? "Submitting..." : (isLoadingTerms || isLoadingPlans || isGeneratingId || isFetchingAnyLocation ? "Processing..." : "Confirm & Submit Registration")}
+              {(isSubmitting || isLoadingTerms || isGeneratingId || isFetchingAnyLocation) && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+              {isSubmitting ? "Submitting..." : (isLoadingTerms || isGeneratingId || isFetchingAnyLocation ? "Processing..." : "Confirm & Submit Registration")}
             </Button>
              <div className="w-full flex justify-end pt-2"> {/* Manage Zones Dialog (keep existing) */} </div>
           </CardFooter>
         </Card>
         )}
 
-        {showReceipt && lastSuccessfulRegistrationData && ( /* ... Receipt Display (keep existing logic) ... */ )}
+        {showReceipt && lastSuccessfulRegistrationData && (
+          <Card className="shadow-lg rounded-xl overflow-hidden print-area" ref={receiptContentRef}>
+            <CardHeader className="bg-primary/10 p-6">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h1 className="text-3xl font-bold text-primary flex items-center">
+                            <Droplets className="mr-3 h-8 w-8" />DropPurity
+                        </h1>
+                        <p className="text-sm text-muted-foreground">Pure Water, Pure Life</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xl font-semibold text-foreground/90">Registration Receipt</p>
+                        <p className="text-sm text-muted-foreground">No: {lastSuccessfulRegistrationData.receiptNumber}</p>
+                        <p className="text-sm text-muted-foreground">Date: {format(new Date(lastSuccessfulRegistrationData.registeredAt), "PPP")}</p>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+                <section>
+                    <h3 className="text-lg font-semibold mb-2 border-b pb-1 text-primary">Customer Details</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                        <p><strong>Name:</strong> {lastSuccessfulRegistrationData.customerName}</p>
+                        <p><strong>Customer ID:</strong> {lastSuccessfulRegistrationData.generatedCustomerId}</p>
+                        <p><strong>Phone:</strong> {lastSuccessfulRegistrationData.customerPhone}</p>
+                        {lastSuccessfulRegistrationData.altMobileNo && <p><strong>Alt. Phone:</strong> {lastSuccessfulRegistrationData.altMobileNo}</p>}
+                        {lastSuccessfulRegistrationData.emailId && <p><strong>Email:</strong> {lastSuccessfulRegistrationData.emailId}</p>}
+                        <p className="sm:col-span-2"><strong>Address:</strong> {`${lastSuccessfulRegistrationData.customerAddress}, ${lastSuccessfulRegistrationData.landmark ? lastSuccessfulRegistrationData.landmark + ', ' : ''}${lastSuccessfulRegistrationData.city}, ${lastSuccessfulRegistrationData.stateName} - ${lastSuccessfulRegistrationData.pincode}`}</p>
+                        {lastSuccessfulRegistrationData.confirmedMapLink && <p className="sm:col-span-2"><strong>Map Link:</strong> <a href={lastSuccessfulRegistrationData.confirmedMapLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Map</a></p>}
+                    </div>
+                </section>
+
+                <section>
+                    <h3 className="text-lg font-semibold mb-2 border-b pb-1 text-primary">Installation & Plan</h3>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                        <p><strong>Model Installed:</strong> {lastSuccessfulRegistrationData.modelInstalled}</p>
+                        <p><strong>Serial Number:</strong> {lastSuccessfulRegistrationData.serialNumber}</p>
+                        <p><strong>Installation:</strong> {format(new Date(lastSuccessfulRegistrationData.installationDate), "PPP")} at {lastSuccessfulRegistrationData.installationTime}</p>
+                        <p><strong>Plan:</strong> {lastSuccessfulRegistrationData.planName}</p>
+                        <p><strong>Plan Price:</strong> ₹{Number(lastSuccessfulRegistrationData.planPrice || 0).toFixed(2)}</p>
+                        <p><strong>Security Deposit:</strong> ₹{Number(lastSuccessfulRegistrationData.securityAmount).toFixed(2)}</p>
+                        <p><strong>Payment Type:</strong> {lastSuccessfulRegistrationData.paymentType}</p>
+                        <p className="font-semibold text-md sm:col-span-2 mt-1"><strong>Total Paid: ₹{(Number(lastSuccessfulRegistrationData.planPrice || 0) + Number(lastSuccessfulRegistrationData.securityAmount)).toFixed(2)}</strong></p>
+                    </div>
+                </section>
+                
+                {(lastSuccessfulRegistrationData.aadhaarFrontPhotoDataUrl || lastSuccessfulRegistrationData.aadhaarBackPhotoDataUrl) && (
+                <section>
+                    <h3 className="text-lg font-semibold mb-2 border-b pb-1 text-primary">Documents</h3>
+                    <div className="flex flex-wrap gap-4">
+                        {lastSuccessfulRegistrationData.aadhaarFrontPhotoDataUrl && <div className="text-sm"><p className="mb-1"><strong>Aadhaar (Front):</strong></p><Image src={lastSuccessfulRegistrationData.aadhaarFrontPhotoDataUrl} alt="Aadhaar Front" width={150} height={90} className="rounded border" data-ai-hint="ID card"/></div>}
+                        {lastSuccessfulRegistrationData.aadhaarBackPhotoDataUrl && <div className="text-sm"><p className="mb-1"><strong>Aadhaar (Back):</strong></p><Image src={lastSuccessfulRegistrationData.aadhaarBackPhotoDataUrl} alt="Aadhaar Back" width={150} height={90} className="rounded border" data-ai-hint="ID card"/></div>}
+                    </div>
+                </section>
+                )}
+                
+                {lastSuccessfulRegistrationData.customerPhotoDataUrl && (
+                 <section>
+                     <h3 className="text-lg font-semibold mb-2 border-b pb-1 text-primary">Customer Photograph</h3>
+                     <Image src={lastSuccessfulRegistrationData.customerPhotoDataUrl} alt="Customer Photograph" width={150} height={150} className="rounded border" data-ai-hint="customer photo"/>
+                 </section>
+                )}
+
+                {lastSuccessfulRegistrationData.signatureDataUrl && (
+                  <section className="mt-6">
+                    <h3 className="text-lg font-semibold mb-2 border-b pb-1 text-primary">Customer Signature</h3>
+                    <div className="p-2 border rounded-md inline-block bg-white">
+                        <Image src={lastSuccessfulRegistrationData.signatureDataUrl} alt="Customer Signature" width={200} height={100} className="rounded" data-ai-hint="signature drawing"/>
+                    </div>
+                  </section>
+                )}
+
+                {termsContent && lastSuccessfulRegistrationData.termsAgreed && (
+                  <section className="mt-6 text-xs text-muted-foreground">
+                    <h4 className="font-semibold text-sm text-foreground/80 mb-1">Terms & Conditions Agreed:</h4>
+                    <div className="max-h-20 overflow-y-auto p-2 border rounded bg-muted/20 text-[0.65rem] leading-tight space-y-0.5">
+                      {termsContent.contentBlocks.map((block, index) => (<p key={index}>{block}</p>))}
+                    </div>
+                  </section>
+                )}
+            </CardContent>
+            <CardFooter className="p-6 border-t bg-muted/30 print-hidden">
+                <div className="flex flex-wrap gap-3 justify-end w-full">
+                    <Button variant="outline" onClick={() => resetFormFieldsAndReceipt()}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> New Registration
+                    </Button>
+                    {receiptDriveLink ? (
+                       <Button variant="outline" asChild>
+                           <a href={receiptDriveLink} target="_blank" rel="noopener noreferrer">
+                               <Download className="mr-2 h-4 w-4" /> View Receipt on Drive
+                           </a>
+                       </Button>
+                    ) : (
+                        <Button variant="outline" onClick={() => handleSaveReceiptToDrive(lastSuccessfulRegistrationData)} disabled={isSavingReceiptToDrive}>
+                           {isSavingReceiptToDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                           {isSavingReceiptToDrive ? "Saving..." : "Save to Drive"}
+                        </Button>
+                    )}
+                    <Button onClick={handlePrintReceipt}><MessageCircle className="mr-2 h-4 w-4" /> Print / Send Receipt</Button>
+                </div>
+            </CardFooter>
+          </Card>
+        )}
       </main>
       <footer className="text-center p-4 border-t text-sm text-muted-foreground mt-auto print-hidden">
         © {new Date().getFullYear()} DropPurity. All rights reserved.
@@ -910,4 +1007,3 @@ export default function NewRegistrationPage() {
     </div>
   );
 }
-    
