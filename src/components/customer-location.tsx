@@ -45,12 +45,13 @@ const CustomerLocation: React.FC<CustomerLocationProps> = ({
       <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`View ${mapLabel} on Google Maps`}>
         <div className="relative aspect-[3/2] w-full bg-muted hover:opacity-90 transition-opacity cursor-pointer">
           <Image
-            src={`https://placehold.co/${placeholderWidth}x${placeholderHeight}.png`} // Using placeholder
+            src={`https://placehold.co/${placeholderWidth}x${placeholderHeight}.png`}
             alt={`Static map for ${mapLabel}`}
-            layout="fill" 
-            objectFit="cover" 
-            className="rounded-t-md" // Only round top if there's a caption below
+            layout="fill"
+            objectFit="cover"
+            className="rounded-t-md"
             data-ai-hint="map location"
+            unoptimized={true} // Serve the image directly without Next.js optimization
           />
            <div className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity opacity-0 hover:opacity-100">
             <p className="text-white text-lg font-semibold">View on Google Maps</p>
