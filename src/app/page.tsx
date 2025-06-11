@@ -107,7 +107,8 @@ export default function DropPurityPage() {
         let errorDetails = `Network response was not ok. Status: ${response.status}`;
         try {
           const errorData = await response.json();
-          errorDetails = errorData.message || errorData.details || JSON.stringify(errorData);
+          // Prioritize details field, then message, then stringify the whole error data
+          errorDetails = errorData.details || errorData.message || JSON.stringify(errorData);
         } catch (e) {
           // Response body might not be JSON, use the status text
           errorDetails = `Network response was not ok. Status: ${response.status} ${response.statusText}`;
