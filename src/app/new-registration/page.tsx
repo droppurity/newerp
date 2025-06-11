@@ -815,56 +815,49 @@ export default function NewRegistrationPage() {
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write('<html><head><title>Print Receipt</title>');
-        // Basic styling for the print window
-        printWindow.document.write(`
-          <style>
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; color: #333; font-size: 12px; line-height: 1.6; }
-            .receipt-container { max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); background-color: #fff; }
-            .receipt-header { text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #ddd; }
-            .receipt-header .company-logo { margin-right: 10px; height: 40px; width: 40px; display: inline-block; vertical-align: middle; }
-            .receipt-header .company-name { font-size: 28px; font-weight: bold; color: hsl(var(--primary)); display: inline-block; vertical-align: middle; }
-            .receipt-header .company-tagline { font-size: 12px; color: #777; margin-top: 2px; }
-            .receipt-header .receipt-title { font-size: 22px; font-weight: 600; color: #333; margin-top: 15px; text-transform: uppercase; letter-spacing: 1px;}
-            
-            .receipt-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; padding-bottom:15px; border-bottom: 1px solid #eee;}
-            .info-column h3 { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 4px;}
-            .info-column p { margin: 0 0 5px 0; font-size: 12px; }
-            .info-column strong { font-weight: 600; color: #444; min-width: 100px; display: inline-block; }
-            .text-right { text-align: right; }
-            
-            .receipt-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
-            .receipt-table th, .receipt-table td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; }
-            .receipt-table th { background-color: #f8f8f8; font-weight: bold; color: #444; }
-            .receipt-table .amount-col { text-align: right; }
-            .receipt-table tfoot td { font-weight: bold; }
-            .receipt-table tfoot .total-label { text-align: right; padding-right: 10px; }
-            
-            .details-section { margin-bottom: 20px; padding-bottom:15px; border-bottom: 1px solid #eee; }
-            .details-section:last-of-type { border-bottom: none; }
-            .details-section h3 { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 4px;}
-            .details-section p { margin: 0 0 5px 0; font-size: 12px; }
-            .details-section strong { font-weight: 600; color: #444; min-width: 120px; display: inline-block; }
-            
-            .signature-section { margin-top: 30px; padding-top: 20px; display: flex; justify-content: space-between; border-top: 1px solid #ddd; }
-            .signature-block { width: 45%; text-align: center; }
-            .signature-block img { border: 1px solid #ddd; border-radius: 4px; padding: 5px; max-width: 180px; height: auto; margin-bottom:5px; background: #fff; display: block; margin-left: auto; margin-right: auto; }
-            .signature-block p { font-size: 11px; color: #666; margin-top: 60px; border-top: 1px solid #aaa; padding-top: 5px; }
-            .signature-block .placeholder-sign { height: 70px; display:flex; align-items:center; justify-content:center; color: #aaa; font-style: italic;}
+        
+        const styles =
+          '<style>' +
+            "body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; color: #333; font-size: 12px; line-height: 1.6; }" +
+            '.receipt-container { max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); background-color: #fff; }' +
+            '.receipt-header { text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #ddd; }' +
+            '.receipt-header .company-logo { margin-right: 10px; height: 40px; width: 40px; display: inline-block; vertical-align: middle; }' +
+            '.receipt-header .company-name { font-size: 28px; font-weight: bold; color: hsl(var(--primary)); display: inline-block; vertical-align: middle; }' +
+            ".receipt-header .company-tagline { font-size: 12px; color: #777; margin-top: 2px; }" +
+            ".receipt-header .receipt-title { font-size: 22px; font-weight: 600; color: #333; margin-top: 15px; text-transform: uppercase; letter-spacing: 1px;}" +
+            '.receipt-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; padding-bottom:15px; border-bottom: 1px solid #eee;}' +
+            ".info-column h3 { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 4px;}" +
+            ".info-column p { margin: 0 0 5px 0; font-size: 12px; }" +
+            ".info-column strong { font-weight: 600; color: #444; min-width: 100px; display: inline-block; }" +
+            ".text-right { text-align: right; }" +
+            '.receipt-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }' +
+            ".receipt-table th, .receipt-table td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; }" +
+            ".receipt-table th { background-color: #f8f8f8; font-weight: bold; color: #444; }" +
+            ".receipt-table .amount-col { text-align: right; }" +
+            ".receipt-table tfoot td { font-weight: bold; }" +
+            ".receipt-table tfoot .total-label { text-align: right; padding-right: 10px; }" +
+            '.details-section { margin-bottom: 20px; padding-bottom:15px; border-bottom: 1px solid #eee; }' +
+            ".details-section:last-of-type { border-bottom: none; }" +
+            ".details-section h3 { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 4px;}" +
+            ".details-section p { margin: 0 0 5px 0; font-size: 12px; }" +
+            ".details-section strong { font-weight: 600; color: #444; min-width: 120px; display: inline-block; }" +
+            '.signature-section { margin-top: 30px; padding-top: 20px; display: flex; justify-content: space-between; border-top: 1px solid #ddd; }' +
+            ".signature-block { width: 45%; text-align: center; }" +
+            ".signature-block img { border: 1px solid #ddd; border-radius: 4px; padding: 5px; max-width: 180px; height: auto; margin-bottom:5px; background: #fff; display: block; margin-left: auto; margin-right: auto; }" +
+            ".signature-block p { font-size: 11px; color: #666; margin-top: 60px; border-top: 1px solid #aaa; padding-top: 5px; }" +
+            ".signature-block .placeholder-sign { height: 70px; display:flex; align-items:center; justify-content:center; color: #aaa; font-style: italic;}" +
+            '.receipt-footer { text-align: center; margin-top: 30px; font-size: 11px; color: #777; border-top: 1px solid #ddd; padding-top: 15px; }' +
+            ".receipt-footer p { margin: 0 0 3px 0; }" +
+            ".print-hidden { display: none !important; }" +
+            "@media print {" +
+              "body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; font-size: 10pt; }" +
+              ".receipt-container { box-shadow: none; border: none; margin: 0; padding: 0; width: 100%;}" +
+              ".print-hidden { display: none !important; }" +
+              ".receipt-info-grid { grid-template-columns: 1fr 1fr; }" +
+            "}" +
+          '</style>';
 
-
-            .receipt-footer { text-align: center; margin-top: 30px; font-size: 11px; color: #777; border-top: 1px solid #ddd; padding-top: 15px; }
-            .receipt-footer p { margin: 0 0 3px 0; }
-            
-            .print-hidden { display: none !important; } /* For hiding elements in print */
-
-            @media print {
-              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; font-size: 10pt; }
-              .receipt-container { box-shadow: none; border: none; margin: 0; padding: 0; width: 100%;}
-              .print-hidden { display: none !important; }
-              .receipt-info-grid { grid-template-columns: 1fr 1fr; } /* Maintain two columns for print */
-            }
-          </style>
-        `);
+        printWindow.document.write(styles);
         printWindow.document.write('</head><body>');
         printWindow.document.write(printContent.innerHTML);
         printWindow.document.write('</body></html>');
@@ -1138,15 +1131,12 @@ export default function NewRegistrationPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="modelInstalled" className="flex items-center"><Package className="inline-block mr-1.5 h-4 w-4 text-primary/70" />Model Installed</Label>
-                    <Select value={modelInstalled} onValueChange={setModelInstalled}>
-                      <SelectTrigger id="modelInstalled">
-                        <SelectValue placeholder="Select Model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Alpha">Alpha</SelectItem>
-                        <SelectItem value="Pro">Pro</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input 
+                      id="modelInstalled" 
+                      placeholder="Enter model name (e.g., Alpha, Pro)" 
+                      value={modelInstalled} 
+                      onChange={(e) => setModelInstalled(e.target.value)} 
+                    />
                   </div>
                   <div>
                     <Label htmlFor="serialNumber" className="flex items-center"><NotebookPen className="inline-block mr-1.5 h-4 w-4 text-primary/70" />Serial Number</Label>
@@ -1575,7 +1565,7 @@ export default function NewRegistrationPage() {
 \nRegistration Summary:
 \nModel Installed: ${lastSuccessfulRegistrationData.modelInstalled}
 \nPlan Selected: ${lastSuccessfulRegistrationData.planName || lastSuccessfulRegistrationData.planSelected}
-\nTotal Amount Paid: Rs ${parseFloat(lastSuccessfulRegistrationData.securityAmount || '0') + parseFloat(lastSuccessfulRegistrationData.planPrice || '0')}.00
+\nTotal Amount Paid: Rs ${(parseFloat(lastSuccessfulRegistrationData.securityAmount || '0') + parseFloat(lastSuccessfulRegistrationData.planPrice || '0')).toFixed(2)}
 \n
 \nYour Receipt Link: ${receiptDriveLink}
 \n
@@ -1626,3 +1616,6 @@ export default function NewRegistrationPage() {
     </div>
   );
 }
+
+    
+
