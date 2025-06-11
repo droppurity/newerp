@@ -1,14 +1,15 @@
 
 "use client";
 
+import Image from 'next/image'; // Import next/image
+
 interface CustomerLocationProps {
   latitude: number;
   longitude: number;
   defaultLatitude: number;
   defaultLongitude: number;
   addressQuery?: string | null; // For using city/state from pincode if precise lat/long not fetched
-  zoom?: number;
-  mapLabel?: string; // This will now be used for the iframe title
+  mapLabel?: string;
 }
 
 const CustomerLocation: React.FC<CustomerLocationProps> = ({
@@ -17,40 +18,48 @@ const CustomerLocation: React.FC<CustomerLocationProps> = ({
   defaultLatitude,
   defaultLongitude,
   addressQuery,
-  zoom = 14,
-  mapLabel = "Service Location Map", 
+  mapLabel = "Service Location",
 }) => {
-  let mapQuery: string;
+  let gMapsQuery: string;
 
+  // Determine the query for Google Maps link
   if (latitude !== defaultLatitude || longitude !== defaultLongitude) {
-    // If latitude or longitude are different from default, assume they've been accurately set (e.g., by GPS)
-    mapQuery = `${latitude},${longitude}`;
+    // If specific coordinates are provided (not default), use them
+    gMapsQuery = `${latitude},${longitude}`;
   } else if (addressQuery) {
-    // Otherwise, if an addressQuery (from pincode) is available, use that
-    mapQuery = addressQuery;
+    // If an address query (from pincode, etc.) is provided, use that
+    gMapsQuery = addressQuery;
   } else {
-    // Fallback to default coordinates for the query
-    mapQuery = `${defaultLatitude},${defaultLongitude}`;
+    // Fallback to default coordinates
+    gMapsQuery = `${defaultLatitude},${defaultLongitude}`;
   }
 
-  // Construct the Google Maps embed URL
-  // Using a keyless embed URL. For production, consider Google Maps Embed API with an API key.
-  const embedMapUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=${zoom}&output=embed&t=m`;
-  // t=m for map view, t=k for satellite view
+  const googleMapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(gMapsQuery)}`;
+
+  // Placeholder image dimensions
+  const placeholderWidth = 600;
+  const placeholderHeight = 400;
 
   return (
-    <div className="w-full aspect-video rounded-md shadow-md overflow-hidden">
-      <iframe
-        width="100%"
-        height="100%"
-        style={{ border: 0 }}
-        loading="lazy"
-        allowFullScreen
-        referrerPolicy="no-referrer-when-downgrade"
-        src={embedMapUrl}
-        title={mapLabel}
-        aria-label={mapLabel}
-      ></iframe>
+    <div className="w-full rounded-md shadow-md overflow-hidden border border-border">
+      <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`View ${mapLabel} on Google Maps`}>
+        <div className="relative aspect-[3/2] w-full bg-muted hover:opacity-90 transition-opacity cursor-pointer">
+          <Image
+            src={`https://placehold.co/${placeholderWidth}x${placeholderHeight}.png`} // Using placeholder
+            alt={`Static map for ${mapLabel}`}
+            layout="fill" 
+            objectFit="cover" 
+            className="rounded-t-md" // Only round top if there's a caption below
+            data-ai-hint="map location"
+          />
+           <div className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity opacity-0 hover:opacity-100">
+            <p className="text-white text-lg font-semibold">View on Google Maps</p>
+          </div>
+        </div>
+      </a>
+      <p className="text-xs text-muted-foreground p-2 text-center bg-background rounded-b-md">
+        Click map to open location. Map query: <span className="font-mono text-xs">{gMapsQuery}</span>
+      </p>
     </div>
   );
 };
