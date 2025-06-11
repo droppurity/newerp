@@ -19,8 +19,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Droplets, LogOut, LayoutDashboard, MapPinIcon as ServiceLocationIcon, Edit3Icon, UserPlus, UserRound, 
+import {
+  Droplets, LogOut, LayoutDashboard, MapPinIcon as ServiceLocationIcon, Edit3Icon, UserPlus, UserRound,
   Home, MapPin as LandmarkIcon, NotebookPen, Loader2, Globe, LocateFixed, Locate, Navigation,
   ExternalLink, Save, FileText, ShieldCheck, Building, Sparkles, Mail, PhoneCall, UserSquare2, ListPlus, PlusCircle, Edit, Trash2, RefreshCw,
   Wrench, Package, CalendarDays, ClockIcon, Droplet, Banknote, ShieldQuestion, ListChecks, ScrollText, AlertCircle,
@@ -51,15 +51,6 @@ const initialSampleZones = [
   { value: "DL03", label: "DL03", stateNameMatch: "Delhi" },
 ];
 
-interface Plan {
-  _id: string;
-  planId: string;
-  planName: string;
-  price: number;
-  dailyWaterLimitLiters: number;
-  durationDays: number;
-}
-
 interface TermsAndConditionsContent {
   _id?: string;
   configKey?: string;
@@ -85,7 +76,7 @@ export default function NewRegistrationPage() {
   const [customerPhone, setCustomerPhone] = useState<string>('1234567890');
   const [altMobileNo, setAltMobileNo] = useState<string>('0987654321');
   const [emailId, setEmailId] = useState<string>('test@example.com');
-  
+
   const [customerPhotoFile, setCustomerPhotoFile] = useState<File | null>(null);
   const [customerPhotoDataUrl, setCustomerPhotoDataUrl] = useState<string | null>(null);
   // Address details state - PREFILLED
@@ -97,7 +88,7 @@ export default function NewRegistrationPage() {
   const [country, setCountry] = useState<string>('');
   const [isFetchingPincodeLocation, setIsFetchingPincodeLocation] = useState<boolean>(false);
   const [pincodeLocationError, setPincodeLocationError] = useState<string | null>(null);
-  
+
   // Geolocation state
   const [mapLatitude, setMapLatitude] = useState<number>(DEFAULT_LATITUDE);
   const [mapLongitude, setMapLongitude] = useState<number>(DEFAULT_LONGITUDE);
@@ -109,14 +100,14 @@ export default function NewRegistrationPage() {
 
   // Identity Verification - PREFILLED
   const [aadhaarNo, setAadhaarNo] = useState<string>('123456789012');
-  const [aadhaarFrontFile, setAadhaarFrontFile] = useState<File | null>(null); 
+  const [aadhaarFrontFile, setAadhaarFrontFile] = useState<File | null>(null);
   const [aadhaarBackFile, setAadhaarBackFile] = useState<File | null>(null);
   const [aadhaarFrontDataUrl, setAadhaarFrontDataUrl] = useState<string | null>(null);
   const [aadhaarBackDataUrl, setAadhaarBackDataUrl] = useState<string | null>(null);
 
   // Administrative Details
   const [currentSampleZones, setCurrentSampleZones] = useState(initialSampleZones);
-  const [selectedZone, setSelectedZone] = useState<string>('JH09'); 
+  const [selectedZone, setSelectedZone] = useState<string>('JH09');
   const [filteredZones, setFilteredZones] = useState(initialSampleZones);
   const [zonePlaceholder, setZonePlaceholder] = useState<string>("Select Zone");
   const [selectedDivision, setSelectedDivision] = useState<string>('');
@@ -131,12 +122,9 @@ export default function NewRegistrationPage() {
   const [tdsAfter, setTdsAfter] = useState<string>('50');
   const [paymentType, setPaymentType] = useState<string>('Online');
   const [securityAmount, setSecurityAmount] = useState<string>('1500');
-  
+
   // Plan Selected State
-  const [plansList, setPlansList] = useState<Plan[]>([]);
-  const [isLoadingPlans, setIsLoadingPlans] = useState<boolean>(true);
-  const [planSelected, setPlanSelected] = useState<string>(''); 
-  const [planFetchError, setPlanFetchError] = useState<string | null>(null);
+  const [planSelected, setPlanSelected] = useState<string>('Basic'); // Default to Basic
 
   // Terms & Conditions
   const [termsContent, setTermsContent] = useState<TermsAndConditionsContent | null>(null);
@@ -145,12 +133,12 @@ export default function NewRegistrationPage() {
   const [termsAgreed, setTermsAgreed] = useState<boolean>(true);
 
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
-  
+
   // Manage Zones Dialog State
   const [isManageZoneDialogOpen, setIsManageZoneDialogOpen] = useState(false);
   const [newZoneNameToAdd, setNewZoneNameToAdd] = useState("");
-  const [zoneToEdit, setZoneToEdit] = useState(""); 
-  const [editedZoneLabel, setEditedZoneLabel] = useState(""); 
+  const [zoneToEdit, setZoneToEdit] = useState("");
+  const [editedZoneLabel, setEditedZoneLabel] = useState("");
 
   // Receipt State
   const [lastSuccessfulRegistrationData, setLastSuccessfulRegistrationData] = useState<any | null>(null);
@@ -164,43 +152,6 @@ export default function NewRegistrationPage() {
     setIsClient(true);
   }, []);
 
-  // Fetch Plans
-  useEffect(() => {
-    if (isClient) {
-      const fetchPlans = async () => {
-        setIsLoadingPlans(true);
-        setPlanFetchError(null);
-        try {
-          const response = await fetch('/api/plans');
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: `Failed to fetch plans: ${response.statusText}` }));
-            throw new Error(errorData.message || `Failed to fetch plans: ${response.statusText}`);
-          }
-          const data = await response.json();
-          if (data.success && Array.isArray(data.plans)) {
-            setPlansList(data.plans);
-            if (data.plans.length > 0) {
-              const defaultPlan = data.plans.find((p: Plan) => p.planId === '25L_3M') || data.plans[0];
-              if (defaultPlan) {
-                setPlanSelected(defaultPlan.planId);
-              }
-            } else {
-               setPlanFetchError("No plans found in the database.");
-            }
-          } else {
-            setPlanFetchError(data.message || 'Invalid plans data format received from /api/plans.');
-          }
-        } catch (error: any) {
-          console.error("Error fetching plans:", error);
-          setPlanFetchError(error.message || "Could not retrieve service plans. Please try again later.");
-          setPlansList([]); 
-        } finally {
-          setIsLoadingPlans(false);
-        }
-      };
-      fetchPlans();
-    }
-  }, [isClient]);
 
   // Fetch Terms and Conditions
   useEffect(() => {
@@ -246,7 +197,7 @@ export default function NewRegistrationPage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, isClient]); 
+  }, [router, isClient]);
 
 
   useEffect(() => {
@@ -259,7 +210,7 @@ export default function NewRegistrationPage() {
       link = `https://www.google.com/maps?q=${DEFAULT_LATITUDE},${DEFAULT_LONGITUDE}`;
     }
     setGeneratedMapLink(link);
-    setConfirmedMapLink(null); 
+    setConfirmedMapLink(null);
   }, [mapLatitude, mapLongitude, pincodeDerivedAddressQuery]);
 
   const handleLogout = () => {
@@ -292,7 +243,7 @@ export default function NewRegistrationPage() {
 
   const updateFilteredZones = useCallback((targetStateName: string | null, zonesSource = currentSampleZones) => {
     if (targetStateName) {
-      const matchedStateZones = zonesSource.filter(zone => 
+      const matchedStateZones = zonesSource.filter(zone =>
         zone.stateNameMatch && zone.stateNameMatch.toLowerCase() === targetStateName.toLowerCase()
       );
       setFilteredZones(matchedStateZones.length > 0 ? matchedStateZones : []);
@@ -305,7 +256,7 @@ export default function NewRegistrationPage() {
       setFilteredZones(zonesSource);
       setZonePlaceholder("Select Zone");
     }
-  }, [currentSampleZones]); 
+  }, [currentSampleZones]);
 
   useEffect(() => {
     updateFilteredZones(stateName, currentSampleZones);
@@ -314,18 +265,18 @@ export default function NewRegistrationPage() {
   const handlePincodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPincode = e.target.value.replace(/\D/g, '');
     setPincode(newPincode);
-    
+
     setCity('');
-    setStateName(''); 
+    setStateName('');
     setCountry('');
     setPincodeLocationError(null);
-    setSelectedZone(''); 
-    
+    setSelectedZone('');
+
     if (newPincode.length === 6) {
       const lastThreeDigits = newPincode.substring(3);
       setSelectedDivision(lastThreeDigits);
       addAlert('default', 'Division Code Set', `Division code "${lastThreeDigits}" set from Pincode.`);
-      
+
       setIsFetchingPincodeLocation(true);
       const locationData: LocationData = await fetchLocationFromPincode(newPincode);
       setIsFetchingPincodeLocation(false);
@@ -333,11 +284,11 @@ export default function NewRegistrationPage() {
       if (locationData.error) {
         setPincodeLocationError(locationData.error);
         addAlert('destructive', 'Pincode Error', locationData.error);
-        updateFilteredZones(null, currentSampleZones); 
+        updateFilteredZones(null, currentSampleZones);
         setPincodeDerivedAddressQuery(null);
-        setSelectedDivision(''); 
+        setSelectedDivision('');
         addAlert('warning', 'Division Code Cleared', 'Pincode lookup failed, Division code cleared.');
-        
+
         if (mapLatitude !== DEFAULT_LATITUDE || mapLongitude !== DEFAULT_LONGITUDE) {
             setLocationStatusMessage('Map shows your fetched GPS location. Pincode lookup failed.');
         } else {
@@ -345,16 +296,16 @@ export default function NewRegistrationPage() {
         }
       } else {
         setCity(locationData.city);
-        setStateName(locationData.state); 
+        setStateName(locationData.state);
         setCountry(locationData.country);
-        updateFilteredZones(locationData.state, currentSampleZones); 
-        
+        updateFilteredZones(locationData.state, currentSampleZones);
+
         const query = `${locationData.city}, ${locationData.state}, ${locationData.country}`.trim();
         setPincodeDerivedAddressQuery(query);
         setLocationStatusMessage(`Address auto-filled from Pincode. Map centered on ${locationData.city ? 'general area of ' + locationData.city : 'default location'}. For precise pin, use 'Fetch My Current Location'.`);
       }
-    } else { 
-      updateFilteredZones(null, currentSampleZones); 
+    } else {
+      updateFilteredZones(null, currentSampleZones);
       setPincodeDerivedAddressQuery(null);
       if (selectedDivision !== '') {
           setSelectedDivision('');
@@ -381,7 +332,7 @@ export default function NewRegistrationPage() {
         setMapLatitude(position.coords.latitude);
         setMapLongitude(position.coords.longitude);
         setIsFetchingGeoLocation(false);
-        setPincodeDerivedAddressQuery(null); 
+        setPincodeDerivedAddressQuery(null);
         setLocationStatusMessage('Current GPS location fetched. Map updated.');
         addAlert('default', 'Location Fetched', 'Your current location has been set on the map.');
       },
@@ -443,7 +394,7 @@ export default function NewRegistrationPage() {
       }
     }
   };
-  
+
    const handleCustomerPhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
@@ -461,13 +412,13 @@ export default function NewRegistrationPage() {
   const handleZoneChange = (value: string) => {
     setSelectedZone(value);
   };
-  
+
   const handleGenerateCustomerId = async () => {
     if (!selectedZone || !selectedDivision || selectedDivision.length !== 3) {
       addAlert('warning', 'Zone & Division Required', 'Please select a zone and ensure Division Code (from Pincode) is valid (3 digits) to generate Customer ID.');
       return;
     }
-    
+
     setIsGeneratingId(true);
     try {
       const response = await fetch(`/api/next-customer-id?zone=${selectedZone}&division=${selectedDivision}`);
@@ -512,10 +463,10 @@ export default function NewRegistrationPage() {
     setLocationStatusMessage(`Map shows default location (Ranchi). Use "Fetch My Current Location" or enter Pincode.`);
     setGeneratedMapLink('');
     setConfirmedMapLink(null);
-    
+
     setAadhaarNo('123456789012');
     const aadhaarFrontInput = document.getElementById('aadhaarFrontFile') as HTMLInputElement | null;
-    if (aadhaarFrontInput) aadhaarFrontInput.value = ""; 
+    if (aadhaarFrontInput) aadhaarFrontInput.value = "";
     setAadhaarFrontFile(null);
     setAadhaarFrontDataUrl(null);
     const aadhaarBackInput = document.getElementById('aadhaarBackFile') as HTMLInputElement | null;
@@ -530,7 +481,7 @@ export default function NewRegistrationPage() {
     }
     setGeneratedCustomerId('');
     updateFilteredZones(null, currentSampleZones);
-    
+
     setModelInstalled('Alpha');
     setSerialNumber('SN12345ALPHA');
     setInstallationDate(new Date());
@@ -540,30 +491,22 @@ export default function NewRegistrationPage() {
     setPaymentType('Online');
     setSecurityAmount('1500');
 
-    if (plansList.length > 0) {
-        const defaultPlan = plansList.find(p => p.planId === '25L_3M') || plansList[0];
-        setPlanSelected(defaultPlan ? defaultPlan.planId : '');
-    } else {
-        setPlanSelected('');
-    }
+    setPlanSelected('Basic'); // Default to Basic
+
     setTermsAgreed(true);
-    setSavedSignature(null); 
-    
-    // This assumes your CustomerSignature component exposes a clear method globally or via ref
-    // A more React-idiomatic way would be to pass a 'clear' prop or manage clear via a key change.
-    if (typeof (window as any).customerSignatureClear === 'function') { 
+    setSavedSignature(null);
+
+    if (typeof (window as any).customerSignatureClear === 'function') {
       (window as any).customerSignatureClear();
     }
 
-
-    // Reset receipt states
     setShowReceipt(false);
     setLastSuccessfulRegistrationData(null);
-    setIsSubmitting(false); 
+    setIsSubmitting(false);
     setIsSavingReceiptToDrive(false);
     setReceiptDriveLink(null);
   };
-  
+
   const handleFormSubmitAttempt = async () => {
     // Validation checks
     if (!customerName.trim()) { addAlert('destructive', 'Validation Error', 'Customer Name is required.'); return; }
@@ -577,7 +520,7 @@ export default function NewRegistrationPage() {
     if (!city || !stateName || !country) { addAlert('warning', 'Missing Location Info', 'City, State, or Country could not be auto-fetched. Please check Pincode and ensure it is valid.'); return; }
     if (!confirmedMapLink) { addAlert('destructive', 'Map Link Not Confirmed', 'Please review and confirm the service location map link.'); return;}
     if (!aadhaarNo.trim() || !/^\d{12}$/.test(aadhaarNo)) { addAlert('destructive', 'Validation Error', 'Valid 12-digit Aadhaar Number is required.'); return; }
-    
+
     if (!selectedZone) { addAlert('destructive', 'Validation Error', 'Zone selection is required.'); return; }
     if (!selectedDivision || selectedDivision.length !== 3) { addAlert('destructive', 'Validation Error', 'Valid 3-digit Division Code (from Pincode) is required.'); return; }
     if (!generatedCustomerId) { addAlert('destructive', 'Validation Error', 'Customer ID must be generated.'); return; }
@@ -596,29 +539,28 @@ export default function NewRegistrationPage() {
     if (!savedSignature) { addAlert('destructive', 'Validation Error', 'Customer signature is required.'); return; }
 
     const receiptNo = `RCPT-${Date.now() % 1000000}`;
-    const selectedPlanDetails = plansList.find(p => p.planId === planSelected);
 
     const registrationData = {
-      receiptNumber: receiptNo, 
+      receiptNumber: receiptNo,
       customerName, fatherSpouseName, customerPhone, altMobileNo, emailId,
       customerAddress, landmark, pincode, city, stateName, country,
-      mapLatitude: mapLatitude === DEFAULT_LATITUDE ? null : mapLatitude, 
-      mapLongitude: mapLongitude === DEFAULT_LONGITUDE ? null : mapLongitude, 
+      mapLatitude: mapLatitude === DEFAULT_LATITUDE ? null : mapLatitude,
+      mapLongitude: mapLongitude === DEFAULT_LONGITUDE ? null : mapLongitude,
       confirmedMapLink,
-      aadhaarNo, 
-      aadhaarFrontPhotoDataUrl: aadhaarFrontDataUrl, // Add this
-      customerPhotoDataUrl: customerPhotoDataUrl, // Add this
-      aadhaarBackPhotoDataUrl: aadhaarBackDataUrl,   // Add this
+      aadhaarNo,
+      aadhaarFrontPhotoDataUrl: aadhaarFrontDataUrl,
+      customerPhotoDataUrl: customerPhotoDataUrl,
+      aadhaarBackPhotoDataUrl: aadhaarBackDataUrl,
       selectedZone, selectedDivision, generatedCustomerId,
       modelInstalled, serialNumber, installationDate: installationDate ? format(installationDate, 'yyyy-MM-dd') : null, installationTime,
-      tdsBefore, tdsAfter, paymentType, securityAmount, 
-      planSelected,
-      planName: selectedPlanDetails?.planName || planSelected,
-      planPrice: selectedPlanDetails?.price ?? 0,
+      tdsBefore, tdsAfter, paymentType, securityAmount,
+      planSelected, // This will be "Basic" or "Commercial"
+      planName: planSelected, // Use the selected value as the name
+      planPrice: 0, // Set price to 0 for static plans
       termsAgreed,
       termsContentSnapshot: termsContent ? { title: termsContent.title, contentBlocks: termsContent.contentBlocks } : null,
       signatureDataUrl: savedSignature,
-      registeredAt: new Date().toISOString(), 
+      registeredAt: new Date().toISOString(),
     };
 
     console.log("Form data to submit to /api/register-customer:", Object.keys(registrationData));
@@ -626,7 +568,7 @@ export default function NewRegistrationPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/register-customer', { 
+      const response = await fetch('/api/register-customer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -634,11 +576,11 @@ export default function NewRegistrationPage() {
         body: JSON.stringify(registrationData),
       });
 
-      const result = await response.json().catch(() => ({ 
-        success: false, 
-        message: 'Received non-JSON response from server.', 
-        details: response.statusText 
-      })); 
+      const result = await response.json().catch(() => ({
+        success: false,
+        message: 'Received non-JSON response from server.',
+        details: response.statusText
+      }));
 
       setIsSubmitting(false);
 
@@ -646,7 +588,7 @@ export default function NewRegistrationPage() {
         addAlert('default', 'Registration Successful!', `Customer ${registrationData.customerName} registered with ID: ${registrationData.generatedCustomerId}. Receipt No: ${receiptNo}`);
         setLastSuccessfulRegistrationData(registrationData);
         setShowReceipt(true);
-        handleSaveReceiptToDrive(registrationData); 
+        handleSaveReceiptToDrive(registrationData);
       } else {
         addAlert('destructive', 'Registration Failed', result.details || result.message || `Server responded with status: ${response.status}.`);
         console.error("Submission error response from API route:", result);
@@ -691,9 +633,7 @@ export default function NewRegistrationPage() {
               </p>
             </div>
           ),
-          duration: 15000, 
-          // Removed direct "Open Drive Link" action from the initial toast
-          // We will provide actions below the receipt view
+          duration: 15000,
         });
         toast({
            title: "Registration Complete",
@@ -701,7 +641,7 @@ export default function NewRegistrationPage() {
            duration: 5000,
            variant: "success",
         });
-        
+
         setReceiptDriveLink(result.receiptUrl);
       } else {
         toast({
@@ -749,10 +689,10 @@ export default function NewRegistrationPage() {
       toast({ title: "Error", description: `Zone "${newZoneValue}" already exists.`, variant: "destructive"});
       return;
     }
-    const newZone = { value: newZoneValue, label: newZoneValue, stateNameMatch: "" }; 
+    const newZone = { value: newZoneValue, label: newZoneValue, stateNameMatch: "" };
     setCurrentSampleZones(prevZones => [...prevZones, newZone]);
     toast({ title: "Zone Added", description: `Zone "${newZoneValue}" has been added.` });
-    setNewZoneNameToAdd(""); 
+    setNewZoneNameToAdd("");
   };
 
   const handleUpdateZone = () => {
@@ -777,18 +717,18 @@ export default function NewRegistrationPage() {
       return;
     }
 
-    setCurrentSampleZones(prevZones => 
-      prevZones.map(zone => 
+    setCurrentSampleZones(prevZones =>
+      prevZones.map(zone =>
         zone.value === zoneToEdit ? { ...zone, value: newLabel, label: newLabel } : zone
       )
     );
 
     if (selectedZone === zoneToEdit) {
-      setSelectedZone(newLabel); 
+      setSelectedZone(newLabel);
     }
-    
+
     toast({ title: "Zone Updated", description: `Zone "${originalZone.label}" updated to "${newLabel}".` });
-    setZoneToEdit(""); 
+    setZoneToEdit("");
     setEditedZoneLabel("");
   };
 
@@ -801,11 +741,11 @@ export default function NewRegistrationPage() {
     setCurrentSampleZones(prevZones => prevZones.filter(zone => zone.value !== zoneToEdit));
 
     if (selectedZone === zoneToEdit) {
-      setSelectedZone(''); 
+      setSelectedZone('');
     }
-    
+
     toast({ title: "Zone Deleted", description: `Zone "${zoneLabelToDelete}" has been deleted.` });
-    setZoneToEdit(""); 
+    setZoneToEdit("");
     setEditedZoneLabel("");
   };
 
@@ -815,7 +755,7 @@ export default function NewRegistrationPage() {
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write('<html><head><title>Print Receipt</title>');
-        
+
         const styles =
           '<style>' +
             "body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; color: #333; font-size: 12px; line-height: 1.6; }" +
@@ -854,16 +794,15 @@ export default function NewRegistrationPage() {
               ".receipt-container { box-shadow: none; border: none; margin: 0; padding: 0; width: 100%;}" +
               ".print-hidden { display: none !important; }" +
               ".receipt-info-grid { grid-template-columns: 1fr 1fr; }" +
-            "}" +
-          '</style>';
+            "}";
 
-        printWindow.document.write(styles);
+        printWindow.document.write('<style>' + styles + '</style>');
         printWindow.document.write('</head><body>');
         printWindow.document.write(printContent.innerHTML);
         printWindow.document.write('</body></html>');
-        printWindow.document.close(); 
-        
-        printWindow.focus(); 
+        printWindow.document.close();
+
+        printWindow.focus();
         setTimeout(() => {
             try {
                 printWindow.print();
@@ -892,7 +831,7 @@ export default function NewRegistrationPage() {
 
   const isFetchingAnyLocation = isFetchingPincodeLocation || isFetchingGeoLocation;
   const canGenerateId = !!selectedZone && !!selectedDivision && selectedDivision.length === 3 && !isGeneratingId;
-  const isFormSubmittable = !isFetchingAnyLocation && !isSubmitting && !isLoadingPlans && !isLoadingTerms && !isGeneratingId;
+  const isFormSubmittable = !isFetchingAnyLocation && !isSubmitting && !isLoadingTerms && !isGeneratingId;
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-muted/10">
@@ -962,7 +901,6 @@ export default function NewRegistrationPage() {
                   {customerPhotoDataUrl && (
                     <div className="mt-2 p-2 border rounded-md w-48 h-auto">
                       <Label className="text-xs text-muted-foreground mb-1 block">Preview:</Label>
-                      {/* Use next/image with explicit width/height */}
                       <Image src={customerPhotoDataUrl} alt="Customer Photograph Preview" width={180} height={180} className="rounded object-contain" data-ai-hint="customer photo"/>
                     </div>
                   )}
@@ -1036,7 +974,7 @@ export default function NewRegistrationPage() {
                 </div>
               )}
             </section>
-            
+
             {/* Identity Verification */}
             <section>
               <h3 className="text-lg font-medium mb-4 flex items-center text-foreground/90">
@@ -1078,8 +1016,8 @@ export default function NewRegistrationPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="zoneSelect">Select Zone</Label>
-                  <Select 
-                    value={selectedZone} 
+                  <Select
+                    value={selectedZone}
                     onValueChange={handleZoneChange}
                     disabled={filteredZones.length === 0 && zonePlaceholder.startsWith("No zones for")}
                   >
@@ -1093,12 +1031,12 @@ export default function NewRegistrationPage() {
                 </div>
                 <div>
                   <Label htmlFor="divisionCode">Division Code</Label>
-                  <Input 
-                    id="divisionCode" 
-                    value={selectedDivision} 
-                    readOnly 
-                    className="bg-muted/50" 
-                    placeholder="From Pincode" 
+                  <Input
+                    id="divisionCode"
+                    value={selectedDivision}
+                    readOnly
+                    className="bg-muted/50"
+                    placeholder="From Pincode"
                   />
                 </div>
               </div>
@@ -1131,11 +1069,11 @@ export default function NewRegistrationPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="modelInstalled" className="flex items-center"><Package className="inline-block mr-1.5 h-4 w-4 text-primary/70" />Model Installed</Label>
-                    <Input 
-                      id="modelInstalled" 
-                      placeholder="Enter model name (e.g., Alpha, Pro)" 
-                      value={modelInstalled} 
-                      onChange={(e) => setModelInstalled(e.target.value)} 
+                    <Input
+                      id="modelInstalled"
+                      placeholder="Enter model name (e.g., Alpha, Pro)"
+                      value={modelInstalled}
+                      onChange={(e) => setModelInstalled(e.target.value)}
                     />
                   </div>
                   <div>
@@ -1172,7 +1110,7 @@ export default function NewRegistrationPage() {
                     <Input id="installationTime" type="time" placeholder="HH:MM" value={installationTime} onChange={(e) => setInstallationTime(e.target.value)} />
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="tdsBefore" className="flex items-center"><Droplet className="inline-block mr-1.5 h-4 w-4 text-primary/70" />TDS Before Installation</Label>
@@ -1205,45 +1143,18 @@ export default function NewRegistrationPage() {
 
                 <div>
                   <Label htmlFor="planSelected" className="flex items-center"><ListChecks className="inline-block mr-1.5 h-4 w-4 text-primary/70" />Plan Selected</Label>
-                   <Select 
-                    value={planSelected} 
+                   <Select
+                    value={planSelected}
                     onValueChange={setPlanSelected}
-                    disabled={isLoadingPlans || plansList.length === 0}
                   >
                     <SelectTrigger id="planSelected">
-                      <SelectValue placeholder={isLoadingPlans ? "Loading plans..." : (plansList.length === 0 ? "No plans available" : "Select Plan")} />
+                      <SelectValue placeholder="Select Plan" />
                     </SelectTrigger>
                     <SelectContent>
-                      {isLoadingPlans ? (
-                        <SelectItem value="loading" disabled>Loading plans...</SelectItem>
-                      ) : (
-                        plansList.length > 0 ? (
-                          plansList.map((plan) => (
-                            <SelectItem key={plan.planId} value={plan.planId}>
-                              {plan.planName} - {plan.price === 0 ? 'Free' : `₹${plan.price}`}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-plans" disabled>No plans available.</SelectItem>
-                        )
-                      )}
+                      <SelectItem value="Basic">Basic Plan</SelectItem>
+                      <SelectItem value="Commercial">Commercial Plan</SelectItem>
                     </SelectContent>
                   </Select>
-                   {planFetchError && !isLoadingPlans && (
-                     <Alert variant="warning" className="mt-2">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Could Not Load Plans</AlertTitle>
-                      <AlertDescription>
-                        {planFetchError}
-                        <br />
-                        Ensure plans are initialized in the database by visiting (once):
-                        <Button variant="link" asChild className="p-0 h-auto font-medium text-primary hover:underline block mt-1">
-                           <Link href="/api/initialize-collections" target="_blank">Initialize Database Collections</Link>
-                        </Button>
-                        After visiting, refresh this page. If the problem persists, check server logs.
-                      </AlertDescription>
-                    </Alert>
-                  )}
                 </div>
               </div>
             </section>
@@ -1251,7 +1162,7 @@ export default function NewRegistrationPage() {
              {/* Terms & Conditions */}
             <section>
               <h3 className="text-lg font-medium mb-4 flex items-center text-foreground/90">
-                <ScrollText className="mr-2 h-5 w-5 text-primary/80" /> 
+                <ScrollText className="mr-2 h-5 w-5 text-primary/80" />
                 {isLoadingTerms ? "Loading Terms & Conditions..." : (termsContent?.title || "Terms & Conditions")}
               </h3>
               <div className="space-y-4">
@@ -1285,9 +1196,9 @@ export default function NewRegistrationPage() {
                   </div>
                 )}
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="termsAgreed" 
-                    checked={termsAgreed} 
+                  <Checkbox
+                    id="termsAgreed"
+                    checked={termsAgreed}
                     onCheckedChange={(checked) => setTermsAgreed(checked as boolean)}
                     disabled={isLoadingTerms || !!termsFetchError || !termsContent}
                   />
@@ -1315,14 +1226,14 @@ export default function NewRegistrationPage() {
             </section>
           </CardContent>
           <CardFooter className="p-6 border-t bg-card flex flex-col items-stretch gap-4">
-            <Button 
+            <Button
               onClick={handleFormSubmitAttempt}
               className="w-full font-semibold text-lg py-3"
               size="lg"
               disabled={!isFormSubmittable}
             >
-              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (isLoadingPlans || isLoadingTerms || isGeneratingId || isFetchingAnyLocation ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null)}
-              {isSubmitting ? "Submitting..." : (isLoadingPlans || isLoadingTerms || isGeneratingId || isFetchingAnyLocation ? "Processing..." : "Confirm & Submit Registration")}
+              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (isLoadingTerms || isGeneratingId || isFetchingAnyLocation ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null)}
+              {isSubmitting ? "Submitting..." : (isLoadingTerms || isGeneratingId || isFetchingAnyLocation ? "Processing..." : "Confirm & Submit Registration")}
             </Button>
              <div className="w-full flex justify-end pt-2">
               <Dialog open={isManageZoneDialogOpen} onOpenChange={setIsManageZoneDialogOpen}>
@@ -1346,7 +1257,7 @@ export default function NewRegistrationPage() {
                         <Button onClick={handleAddNewZone} size="sm"><PlusCircle className="mr-1.5 h-4 w-4" /> Add</Button>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2 p-4 border rounded-md">
                        <Label htmlFor="edit-zone-select" className="flex items-center text-md font-semibold"><Edit className="mr-2 h-5 w-5 text-primary" />Edit / Delete Zone</Label>
                        <Select value={zoneToEdit} onValueChange={setZoneToEdit}>
@@ -1360,11 +1271,11 @@ export default function NewRegistrationPage() {
                         {zoneToEdit && (
                           <div className="space-y-2 mt-3">
                             <Label htmlFor="edited-zone-label">New Zone Label/Code</Label>
-                            <Input 
-                              id="edited-zone-label" 
-                              placeholder="Enter new label/code" 
-                              value={editedZoneLabel} 
-                              onChange={(e) => setEditedZoneLabel(e.target.value)} 
+                            <Input
+                              id="edited-zone-label"
+                              placeholder="Enter new label/code"
+                              value={editedZoneLabel}
+                              onChange={(e) => setEditedZoneLabel(e.target.value)}
                             />
                             <div className="flex gap-2 mt-2 justify-end">
                               <Button onClick={handleUpdateZone} size="sm" variant="outline" disabled={!editedZoneLabel.trim()}><RefreshCw className="mr-1.5 h-4 w-4" /> Update</Button>
@@ -1423,7 +1334,7 @@ export default function NewRegistrationPage() {
                 <p className="company-tagline text-sm text-muted-foreground">Pure Water, Pure Life</p>
                 <p className="receipt-title text-2xl sm:text-3xl font-semibold text-foreground mt-4">REGISTRATION RECEIPT</p>
               </div>
-        
+
               {/* Customer and Receipt Info Grid */}
               <div className="receipt-info-grid grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-6 pb-4 border-b border-border">
                 {/* Customer Photo Section - Centered above details */}
@@ -1442,9 +1353,9 @@ export default function NewRegistrationPage() {
                   <p><strong>City/State:</strong> {`${lastSuccessfulRegistrationData.city}, ${lastSuccessfulRegistrationData.stateName} - ${lastSuccessfulRegistrationData.pincode}`}</p>
                   <p><strong>Phone:</strong> {lastSuccessfulRegistrationData.customerPhone}</p>
                   {lastSuccessfulRegistrationData.emailId && <p><strong>Email:</strong> {lastSuccessfulRegistrationData.emailId}</p>}
-                  {lastSuccessfulRegistrationData.confirmedMapLink && 
+                  {lastSuccessfulRegistrationData.confirmedMapLink &&
                     <p>
-                      <strong>Map Link:</strong> 
+                      <strong>Map Link:</strong>
                       <a href={lastSuccessfulRegistrationData.confirmedMapLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
                         View Location
                       </a>
@@ -1456,12 +1367,12 @@ export default function NewRegistrationPage() {
                   <p><strong className="md:w-auto">Receipt No:</strong> {lastSuccessfulRegistrationData.receiptNumber}</p>
                   <p><strong className="md:w-auto">Customer ID:</strong> {lastSuccessfulRegistrationData.generatedCustomerId}</p>
                   <p><strong className="md:w-auto">Registration Date:</strong> {format(new Date(lastSuccessfulRegistrationData.registeredAt || Date.now()), "PPP")}</p>
-                  {lastSuccessfulRegistrationData.installationDate && 
+                  {lastSuccessfulRegistrationData.installationDate &&
                       <p><strong className="md:w-auto">Installation:</strong> {format(new Date(lastSuccessfulRegistrationData.installationDate + 'T00:00:00'), "PPP")} at {lastSuccessfulRegistrationData.installationTime}</p>
                   }
                 </div>
               </div>
-        
+
               {/* Items Table */}
               <div className="details-section mb-6 pb-4 border-b border-border">
                 <h3 className="text-sm font-semibold uppercase text-muted-foreground mb-3">SERVICE & PLAN DETAILS:</h3>
@@ -1500,7 +1411,7 @@ export default function NewRegistrationPage() {
                   </table>
                 </div>
               </div>
-        
+
               {/* Other Details Sections */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-6 pb-4 border-b border-border">
                 <div className="details-section !border-b-0 md:!border-b !pb-0 md:!pb-4">
@@ -1515,7 +1426,7 @@ export default function NewRegistrationPage() {
                     <p><strong>TDS After:</strong> {lastSuccessfulRegistrationData.tdsAfter} ppm</p>
                 </div>
               </div>
-              
+
               <div className="details-section mb-6 pb-4 border-b border-border">
                 <h3 className="text-sm font-semibold uppercase text-muted-foreground mb-3">AGREEMENT:</h3>
                 <p><strong>Terms Agreed:</strong> {lastSuccessfulRegistrationData.termsAgreed ? 'Yes' : 'No'}</p>
@@ -1526,7 +1437,7 @@ export default function NewRegistrationPage() {
                     <p><strong>Aadhaar (Back):</strong> Image Captured</p>
                 )}
               </div>
-        
+
               {/* Signatures */}
               <div className="signature-section mt-8 pt-6">
                 <div className="signature-block">
@@ -1544,7 +1455,7 @@ export default function NewRegistrationPage() {
                   <p>Authorised Signature for DropPurity</p>
                 </div>
               </div>
-        
+
               {/* Footer */}
               <div className="receipt-footer mt-10 pt-6 border-t border-border text-center text-xs text-muted-foreground">
                 <p>This is a computer-generated receipt. For any queries, please contact DropPurity support.</p>
@@ -1552,7 +1463,7 @@ export default function NewRegistrationPage() {
                 <p className="mt-2 font-semibold">Thank you for choosing DropPurity!</p>
               </div>
             </div>
-        
+
             {/* Action Buttons - Not part of the printable receipt content */}
             <CardFooter className="print-hidden p-6 mt-6 border-t border-border flex flex-col sm:flex-row justify-between items-center gap-4 bg-muted/30 rounded-b-lg">
               <div className="flex flex-wrap gap-2">
@@ -1572,10 +1483,8 @@ export default function NewRegistrationPage() {
 \nThank you for choosing DropPurity!
 `;
 
-                    // Ensure phone number starts with country code if not already
                     const internationalPhoneNumber = customerPhoneNumber.startsWith('91') ? customerPhoneNumber : `91${customerPhoneNumber}`;
 
-                    // Use web.whatsapp.com for desktop and wa.me for mobile
                     const whatsappBaseUrl = /Mobi|Android/i.test(navigator.userAgent) ? 'wa.me' : 'web.whatsapp.com/send';
                     const whatsappUrl = `https://${whatsappBaseUrl}/?phone=${internationalPhoneNumber}&text=${encodeURIComponent(message)}`;
                     window.open(whatsappUrl, '_blank');
@@ -1616,6 +1525,3 @@ export default function NewRegistrationPage() {
     </div>
   );
 }
-
-    
-
