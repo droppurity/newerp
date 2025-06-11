@@ -506,7 +506,9 @@ export default function NewRegistrationPage() {
       mapLongitude: mapLongitude === DEFAULT_LONGITUDE ? null : mapLongitude,
       confirmedMapLink,
       aadhaarNo,
-      aadhaarFrontPhotoDataUrl, customerPhotoDataUrl, aadhaarBackPhotoDataUrl,
+      aadhaarFrontDataUrl, 
+      customerPhotoDataUrl, 
+      aadhaarBackDataUrl,
       selectedZone, selectedDivision, generatedCustomerId,
       modelInstalled, serialNumber, installationDate: installationDate ? format(installationDate, 'yyyy-MM-dd') : null, installationTime,
       tdsBefore, tdsAfter, paymentType, securityAmount,
@@ -943,12 +945,12 @@ export default function NewRegistrationPage() {
                     </div>
                 </section>
                 
-                {(lastSuccessfulRegistrationData.aadhaarFrontPhotoDataUrl || lastSuccessfulRegistrationData.aadhaarBackPhotoDataUrl) && (
+                {(lastSuccessfulRegistrationData.aadhaarFrontDataUrl || lastSuccessfulRegistrationData.aadhaarBackDataUrl) && (
                 <section>
                     <h3 className="text-lg font-semibold mb-2 border-b pb-1 text-primary">Documents</h3>
                     <div className="flex flex-wrap gap-4">
-                        {lastSuccessfulRegistrationData.aadhaarFrontPhotoDataUrl && <div className="text-sm"><p className="mb-1"><strong>Aadhaar (Front):</strong></p><Image src={lastSuccessfulRegistrationData.aadhaarFrontPhotoDataUrl} alt="Aadhaar Front" width={150} height={90} className="rounded border" data-ai-hint="ID card"/></div>}
-                        {lastSuccessfulRegistrationData.aadhaarBackPhotoDataUrl && <div className="text-sm"><p className="mb-1"><strong>Aadhaar (Back):</strong></p><Image src={lastSuccessfulRegistrationData.aadhaarBackPhotoDataUrl} alt="Aadhaar Back" width={150} height={90} className="rounded border" data-ai-hint="ID card"/></div>}
+                        {lastSuccessfulRegistrationData.aadhaarFrontDataUrl && <div className="text-sm"><p className="mb-1"><strong>Aadhaar (Front):</strong></p><Image src={lastSuccessfulRegistrationData.aadhaarFrontDataUrl} alt="Aadhaar Front" width={150} height={90} className="rounded border" data-ai-hint="ID card"/></div>}
+                        {lastSuccessfulRegistrationData.aadhaarBackDataUrl && <div className="text-sm"><p className="mb-1"><strong>Aadhaar (Back):</strong></p><Image src={lastSuccessfulRegistrationData.aadhaarBackDataUrl} alt="Aadhaar Back" width={150} height={90} className="rounded border" data-ai-hint="ID card"/></div>}
                     </div>
                 </section>
                 )}
