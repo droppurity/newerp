@@ -1,15 +1,14 @@
 
 "use client";
 
-import Image from 'next/image'; // Import next/image
-
 interface CustomerLocationProps {
   latitude: number;
   longitude: number;
-  defaultLatitude: number;
+  defaultLatitude: number; // To know if we are using default or actual coordinates
   defaultLongitude: number;
-  addressQuery?: string | null; // For using city/state from pincode if precise lat/long not fetched
+  addressQuery?: string | null;
   mapLabel?: string;
+  height?: string; // Allow custom height for the map
 }
 
 const CustomerLocation: React.FC<CustomerLocationProps> = ({
@@ -19,10 +18,12 @@ const CustomerLocation: React.FC<CustomerLocationProps> = ({
   defaultLongitude,
   addressQuery,
   mapLabel = "Service Location",
+  height = "400px", // Default height for the map iframe
 }) => {
+  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
   let gMapsQuery: string;
 
-  // Determine the query for Google Maps link
   if (latitude !== defaultLatitude || longitude !== defaultLongitude) {
     // If specific coordinates are provided (not default), use them
     gMapsQuery = `${latitude},${longitude}`;
@@ -30,36 +31,40 @@ const CustomerLocation: React.FC<CustomerLocationProps> = ({
     // If an address query (from pincode, etc.) is provided, use that
     gMapsQuery = addressQuery;
   } else {
-    // Fallback to default coordinates
+    // Fallback to default coordinates if no specific addressQuery
     gMapsQuery = `${defaultLatitude},${defaultLongitude}`;
   }
 
-  const googleMapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(gMapsQuery)}`;
+  const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY_HERE'}&q=${encodeURIComponent(gMapsQuery)}`;
 
-  // Placeholder image dimensions
-  const placeholderWidth = 600;
-  const placeholderHeight = 400;
+  if (!GOOGLE_MAPS_API_KEY) {
+    return (
+      <div className="w-full p-4 my-4 border border-destructive rounded-md bg-destructive/10 text-destructive-foreground text-center">
+        <p className="font-semibold">Google Maps API Key Missing</p>
+        <p className="text-sm">
+          To display the map, please obtain a Google Maps API key, enable the "Maps Embed API",
+          and add your key as <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to the <code>.env.local</code> file.
+          Then, restart your development server.
+        </p>
+        <p className="text-xs mt-2">Map query would be for: {gMapsQuery}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full rounded-md shadow-md overflow-hidden border border-border">
-      <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" aria-label={`View ${mapLabel} on Google Maps`}>
-        <div className="relative aspect-[3/2] w-full bg-muted hover:opacity-90 transition-opacity cursor-pointer">
-          <Image
-            src={`https://placehold.co/${placeholderWidth}x${placeholderHeight}.png`}
-            alt={`Static map for ${mapLabel}`}
-            layout="fill"
-            objectFit="cover"
-            className="rounded-t-md"
-            data-ai-hint="map location"
-            unoptimized={true} // Serve the image directly without Next.js optimization
-          />
-           <div className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity opacity-0 hover:opacity-100">
-            <p className="text-white text-lg font-semibold">View on Google Maps</p>
-          </div>
-        </div>
-      </a>
+    <div className="w-full rounded-md shadow-md overflow-hidden border border-border my-4">
+      <iframe
+        width="100%"
+        style={{ border: 0, height: height }}
+        loading="lazy"
+        allowFullScreen
+        referrerPolicy="no-referrer-when-downgrade"
+        src={mapEmbedUrl}
+        title={mapLabel}
+        aria-label={mapLabel}
+      ></iframe>
       <p className="text-xs text-muted-foreground p-2 text-center bg-background rounded-b-md">
-        Click map to open location. Map query: <span className="font-mono text-xs">{gMapsQuery}</span>
+        Map query: <span className="font-mono text-xs">{gMapsQuery}</span>
       </p>
     </div>
   );
