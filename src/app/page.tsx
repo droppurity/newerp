@@ -104,7 +104,15 @@ export default function DropPurityPage() {
     try {
       const response = await fetch('/api/customers');
       if (!response.ok) {
-        throw new Error('Failed to fetch customers for plan expiry checks.');
+        let errorDetails = `Network response was not ok. Status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorDetails = errorData.message || errorData.details || JSON.stringify(errorData);
+        } catch (e) {
+          // Response body might not be JSON, use the status text
+          errorDetails = `Network response was not ok. Status: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(`Failed to fetch customers for plan expiry checks: ${errorDetails}`);
       }
       const data = await response.json();
       if (data.success && Array.isArray(data.customers)) {
