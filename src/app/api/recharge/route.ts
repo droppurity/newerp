@@ -1,7 +1,7 @@
 
-// src/app/api/recharge/route.ts
 import { type NextRequest, NextResponse } from 'next/server';
 import { MongoClient, Db, ObjectId, MongoError } from 'mongodb';
+import { addDays } from 'date-fns';
 
 // --- Environment Variables ---
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -73,10 +73,10 @@ export async function POST(request: NextRequest) {
   }
   
   const { 
-    customerId, // MongoDB ObjectId string
-    customerGeneratedId, // String ID like JH09d...
-    planId,      // String planId like 25L_3M
+    customerId, // MongoDB ObjectId string for the customer
+    planId,     // String planId for the new plan
     paymentMethod,
+    // customerGeneratedId is implicitly fetched from the customer document
   } = requestBody;
 
   if (!customerId || !planId || !paymentMethod) {
@@ -90,29 +90,22 @@ export async function POST(request: NextRequest) {
     const db = await connectToDatabase();
     const customersCollection = db.collection('customers');
     const plansCollection = db.collection('plans');
-    const rechargesCollection = db.collection('recharges'); // New collection for recharge history
+    const rechargesCollection = db.collection('recharges');
 
-    // 1. Verify Customer Exists
     const customerObjectId = new ObjectId(customerId);
     const customer = await customersCollection.findOne({ _id: customerObjectId });
     if (!customer) {
       return NextResponse.json({ success: false, message: 'Customer not found.' }, { status: 404 });
     }
 
-    // 2. Verify Plan Exists
     const plan = await plansCollection.findOne({ planId: planId, isActive: true });
     if (!plan) {
-      return NextResponse.json({ success: false, message: 'Plan not found or is inactive.' }, { status: 404 });
+      return NextResponse.json({ success: false, message: `Plan with ID ${planId} not found or is inactive.` }, { status: 404 });
     }
 
-    // 3. (Placeholder) Process Payment - In a real app, integrate with a payment gateway here
-    // For now, we assume payment is successful if paymentMethod is provided.
-
-    // 4. Update Customer's Plan Information (Example fields - adjust to your schema)
-    //    This is a simplified example. You'd likely calculate a new planEndDate.
     const currentDate = new Date();
-    const planEndDate = new Date(currentDate);
-    planEndDate.setDate(planEndDate.getDate() + plan.durationDays);
+    const newPlanStartDate = currentDate;
+    const newPlanEndDate = addDays(currentDate, plan.durationDays || 30);
 
     const customerUpdateResult = await customersCollection.updateOne(
       { _id: customerObjectId },
@@ -121,45 +114,48 @@ export async function POST(request: NextRequest) {
           currentPlanId: plan.planId,
           currentPlanName: plan.planName,
           planPricePaid: plan.price,
-          planStartDate: currentDate,
-          planEndDate: planEndDate,
+          planStartDate: newPlanStartDate,
+          planEndDate: newPlanEndDate,
+          espCycleMaxHours: plan.espCycleMaxHours || 0,
+          espCycleMaxDays: plan.durationDays || 0,
+          currentTotalHours: 0, // Reset ESP's total running hours for the new cycle
           lastRechargeDate: currentDate,
           updatedAt: currentDate,
         },
-        $inc: { rechargeCount: 1 } // Optional: track number of recharges
+        $inc: { rechargeCount: 1 } 
       }
     );
 
     if (customerUpdateResult.modifiedCount === 0 && customerUpdateResult.matchedCount === 0) {
-        // This case should be rare if customer was found earlier, but good to handle.
-        return NextResponse.json({ success: false, message: 'Failed to update customer record, customer might not exist or no changes were made.' }, { status: 500 });
-    } else if (customerUpdateResult.modifiedCount === 0 && customerUpdateResult.matchedCount > 0) {
-        console.warn(`API Route (recharge): Customer record for ${customerGeneratedId} matched but was not modified. This might mean the new plan data is identical to existing data, or an issue with the update query.`);
+        return NextResponse.json({ success: false, message: 'Failed to update customer record (customer not found or no changes needed).' }, { status: 500 });
     }
 
-
-    // 5. Create a recharge record
     const rechargeRecord = {
       customerId: customerObjectId,
-      customerGeneratedId: customer.generatedCustomerId || customerGeneratedId, // Use fetched customer's ID
+      customerGeneratedId: customer.generatedCustomerId,
       planId: plan.planId,
       planName: plan.planName,
       planPrice: plan.price,
       planDurationDays: plan.durationDays,
       paymentMethod: paymentMethod,
       rechargeDate: currentDate,
-      // transactionId: "placeholder_txn_id_123" // From payment gateway
+      newPlanStartDate: newPlanStartDate,
+      newPlanEndDate: newPlanEndDate,
+      // transactionId: "placeholder_txn_id_from_payment_gateway" 
     };
     await rechargesCollection.insertOne(rechargeRecord);
 
-    console.log(`API Route (recharge): Recharge processed for customer ${customer.customerName} (ID: ${customer.generatedCustomerId}), Plan: ${plan.planName}`);
+    console.log(`API Route (recharge): Recharge processed for customer ${customer.customerName} (ID: ${customer.generatedCustomerId}), New Plan: ${plan.planName}`);
     
     return NextResponse.json(
         { 
           success: true, 
           message: `Plan "${plan.planName}" successfully recharged for ${customer.customerName}.`,
           rechargeDetails: {
-            planEndDate: planEndDate.toISOString(),
+            planEndDate: newPlanEndDate.toISOString(),
+            newPlanStartDate: newPlanStartDate.toISOString(),
+            customerName: customer.customerName,
+            planName: plan.planName,
           }
         }, 
         { status: 200 }
@@ -178,3 +174,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: errorMessage, details: error.message }, { status: statusCode });
   }
 }
+    

@@ -1,6 +1,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
-import { MongoClient, Db, MongoError } from 'mongodb';
+import { MongoClient, Db, MongoError, ObjectId } from 'mongodb';
+import { format, addDays } from 'date-fns';
 
 console.log('API Route Module: /api/register-customer/route.ts loaded.');
 
@@ -13,44 +14,44 @@ let mongoClientInstance: MongoClient | null = null;
 let cachedDbInstance: Db | null = null;
 
 async function connectToDatabase(): Promise<Db> {
-  console.log('API Route: connectToDatabase called.');
+  console.log('API Route (register-customer): connectToDatabase called.');
   if (cachedDbInstance && mongoClientInstance?.topology?.isConnected()) {
-    console.log('API Route: Using cached MongoDB connection and client is connected.');
+    console.log('API Route (register-customer): Using cached MongoDB connection.');
     return cachedDbInstance;
   }
   if (!MONGODB_URI) {
-    console.error('API Route CRITICAL ERROR: MONGODB_URI not found in environment variables.');
-    throw new Error('API Route: MONGODB_URI not found in environment variables.');
+    console.error('API Route (register-customer) CRITICAL ERROR: MONGODB_URI not found.');
+    throw new Error('MONGODB_URI not found.');
   }
 
-  console.log('API Route: Attempting new MongoDB connection...');
+  console.log('API Route (register-customer): Attempting new MongoDB connection...');
   try {
     if (!mongoClientInstance || !mongoClientInstance.topology || !mongoClientInstance.topology.isConnected()) {
         if (mongoClientInstance) {
-            console.log('API Route: Existing MongoDB client found but not connected, attempting to close and re-initialize.');
+            console.log('API Route (register-customer): Existing MongoDB client found but not connected, closing.');
             await mongoClientInstance.close();
         }
         mongoClientInstance = new MongoClient(MONGODB_URI);
-        console.log('API Route: New MongoClient instance created.');
+        console.log('API Route (register-customer): New MongoClient instance created.');
     }
     
     await mongoClientInstance.connect();
-    console.log('API Route: Successfully connected to MongoDB server.');
+    console.log('API Route (register-customer): Successfully connected to MongoDB server.');
     const db = mongoClientInstance.db(DB_NAME);
     
-    console.log(`API Route: Attempting to ping MongoDB database: ${DB_NAME}...`);
+    console.log(`API Route (register-customer): Attempting to ping MongoDB database: ${DB_NAME}...`);
     await db.command({ ping: 1 });
-    console.log(`API Route: Successfully pinged MongoDB database: ${DB_NAME}`);
+    console.log(`API Route (register-customer): Successfully pinged MongoDB database: ${DB_NAME}`);
     
     cachedDbInstance = db;
     return db;
   } catch (err: any) {
-    console.error(`API Route CRITICAL ERROR: Failed to connect to MongoDB or ping database ${DB_NAME}. Error: ${err.message}`, err);
+    console.error(`API Route (register-customer) CRITICAL ERROR: Failed to connect or ping database ${DB_NAME}. Error: ${err.message}`, err);
     if (mongoClientInstance) {
       try {
         await mongoClientInstance.close();
       } catch (closeErr) {
-        console.error('API Route: Error closing MongoDB client after connection failure:', closeErr);
+        console.error('API Route (register-customer): Error closing MongoDB client after connection failure:', closeErr);
       }
     }
     mongoClientInstance = null;
@@ -61,110 +62,121 @@ async function connectToDatabase(): Promise<Db> {
 
 
 export async function POST(request: NextRequest) {
-  console.log("API Route: /api/register-customer POST handler invoked (MongoDB only).");
+  console.log("API Route: /api/register-customer POST handler invoked.");
 
   if (!MONGODB_URI) {
-    console.error("API Route /register-customer: MongoDB URI not configured. Cannot process request.");
-    const errorResponse = { success: false, message: 'Server Configuration Error: Database URI not configured. Check server logs.', details: 'MONGODB_URI is not set in environment variables.' };
-    console.log("API Route /register-customer: Sending error response:", errorResponse);
-     return NextResponse.json(errorResponse, { status: 500 });
+    console.error("API Route /register-customer: MongoDB URI not configured.");
+    return NextResponse.json({ success: false, message: 'Server Configuration Error: Database URI not configured.' }, { status: 500 });
   }
 
   let requestBody;
   try {
-    console.log("API Route /register-customer: Attempting to parse request body...");
     requestBody = await request.json();
-    console.log("API Route /register-customer: Request body parsed successfully:", requestBody);
   } catch (jsonError: any) {
     console.error('API Route /register-customer: Invalid JSON in request body.', jsonError);
-    // It's good practice to log the invalid JSON if possible for debugging,
-    // but be cautious with logging potentially sensitive data.
-    // console.error('Invalid JSON content:', await request.text().catch(() => 'Could not read body as text'));
-
-
-    const errorResponse = { success: false, message: 'Bad Request: Invalid JSON format.', details: jsonError.message };
-    console.log("API Route /register-customer: Sending error response for invalid JSON:", errorResponse);
-    return NextResponse.json(errorResponse, { status: 400 });
+    return NextResponse.json({ success: false, message: 'Bad Request: Invalid JSON format.', details: jsonError.message }, { status: 400 });
   }
   
   try {
     const { 
-      customerName, 
-      customerPhone, 
-      generatedCustomerId,
-      // ... all other fields from registrationData are in requestBody
+      customerName, customerPhone, generatedCustomerId, planSelected, installationDate, // planSelected is planId
+      ...otherRegistrationData 
     } = requestBody;
     
-    // Basic validation, can be expanded
-    if (!customerName || !customerPhone || !generatedCustomerId) {
-      console.warn("API Route /register-customer: Missing required fields in request body:", {customerNameExists: !!customerName, customerPhoneExists: !!customerPhone, customerIdExists: !!generatedCustomerId});
-      const errorResponse = { success: false, message: 'Bad Request: Missing required fields (e.g., name, phone, or customer ID).', details: 'Validation failed on server for core fields.' };
-      console.log("API Route /register-customer: Sending error response for missing fields:", errorResponse);
-      return NextResponse.json(errorResponse, { status: 400 });
+    if (!customerName || !customerPhone || !generatedCustomerId || !planSelected || !installationDate) {
+      console.warn("API Route /register-customer: Missing required fields:", {customerName, customerPhone, generatedCustomerId, planSelected, installationDate});
+      return NextResponse.json({ success: false, message: 'Bad Request: Missing required fields (name, phone, customer ID, plan, or installation date).' }, { status: 400 });
     }
     
-    console.log("API Route /register-customer: Attempting to connect to database...");
     const db = await connectToDatabase();
-    console.log("API Route /register-customer: Database connection established.");
-    
-    // Use 'customers' as the collection name, consistent with your server.js
     const customersCollection = db.collection('customers'); 
+    const plansCollection = db.collection('plans');
+    const rechargesCollection = db.collection('recharges');
 
-    // The entire requestBody is the customerDocument as prepared by the frontend
-    // Create a new document object to exclude image data URLs
+    // Fetch selected plan details
+    const plan = await plansCollection.findOne({ planId: planSelected, isActive: true });
+    if (!plan) {
+      return NextResponse.json({ success: false, message: `Plan with ID ${planSelected} not found or is inactive.` }, { status: 400 });
+    }
+
+    const parsedInstallationDate = new Date(installationDate);
+    if (isNaN(parsedInstallationDate.getTime())) {
+        return NextResponse.json({ success: false, message: 'Invalid installation date format.' }, { status: 400 });
+    }
+    const planEndDate = addDays(parsedInstallationDate, plan.durationDays || 30); // Default to 30 days if duration not set
+
     const customerDocument: any = {
-      ...requestBody,
-      registeredAt: new Date(), // Add a server-side timestamp
+      ...otherRegistrationData, // Includes securityAmount, aadhaarNo, etc.
+      customerName,
+      customerPhone,
+      generatedCustomerId,
+      registeredAt: new Date(),
+      updatedAt: new Date(),
+      currentPlanId: plan.planId,
+      currentPlanName: plan.planName,
+      planPricePaid: plan.price, // Price of the initial plan
+      planStartDate: parsedInstallationDate,
+      planEndDate: planEndDate,
+      espCycleMaxHours: plan.espCycleMaxHours || 0, // ESP total hours for this plan cycle
+      espCycleMaxDays: plan.durationDays || 0,     // ESP days for this plan cycle
+      currentTotalHours: 0, // ESP's total running hours for current cycle, starts at 0
+      lastRechargeDate: parsedInstallationDate, // Initial plan activation
+      rechargeCount: 1,
+      lastUsage: [],
+      lastContact: new Date(),
     };
 
-    // Explicitly remove image data URLs to prevent saving them in MongoDB
-    // This is crucial for keeping the database size manageable and secure
+    // Remove image data URLs if they were sent
     delete customerDocument.aadhaarFrontPhotoDataUrl;
     delete customerDocument.customerPhotoDataUrl;
     delete customerDocument.aadhaarBackPhotoDataUrl;
-    // Also remove signature if present and not intended for DB
     delete customerDocument.signatureDataUrl;
-    delete customerDocument.mapLatitude;
-    delete customerDocument.mapLongitude;
     delete customerDocument.termsContentSnapshot;
+    // Retain mapLatitude, mapLongitude if they are actual numbers
+    if (typeof customerDocument.mapLatitude !== 'number') delete customerDocument.mapLatitude;
+    if (typeof customerDocument.mapLongitude !== 'number') delete customerDocument.mapLongitude;
 
-    
-    console.log("API Route /register-customer: Attempting to insert document into 'customers' collection:", customerDocument);
+
     const result = await customersCollection.insertOne(customerDocument);
+    const customerMongoId = result.insertedId;
+
+    // Create initial recharge log entry
+    const initialRechargeLog = {
+      customerId: customerMongoId,
+      customerGeneratedId: generatedCustomerId,
+      planId: plan.planId,
+      planName: plan.planName,
+      planPrice: plan.price,
+      planDurationDays: plan.durationDays,
+      paymentMethod: otherRegistrationData.paymentType || 'InitialSetup',
+      rechargeDate: parsedInstallationDate,
+      newPlanStartDate: parsedInstallationDate,
+      newPlanEndDate: planEndDate,
+      transactionId: `REG-${generatedCustomerId}` // Example transaction ID for registration
+    };
+    await rechargesCollection.insertOne(initialRechargeLog);
     
-    const customerIdFromResult = result.insertedId;
-    console.log('API Route: Customer registration data saved to MongoDB. Result acknowledged:', result.acknowledged, 'Saved Customer ID:', customerIdFromResult);
+    console.log('API Route: Customer registered and initial plan logged. MongoDB ID:', customerMongoId);
 
     return NextResponse.json(
-        { success: true, customerId: customerIdFromResult, message: 'Customer registered successfully with MongoDB.' }, 
+        { success: true, customerId: customerMongoId, message: 'Customer registered successfully.' }, 
         { status: 201 }
     );
 
   } catch (error: any) {
-    console.error('API Route Error in /register-customer POST handler. Error object:', error);
+    console.error('API Route Error in /register-customer POST handler:', error);
     let errorMessage = 'An unexpected error occurred during registration.';
-    let errorDetails = 'No specific details available.';
+    let statusCode = 500;
 
     if (error instanceof MongoError) {
         errorMessage = 'Database operation failed.';
-        errorDetails = `MongoDB Error (${error.codeName || error.code || 'N/A'}): ${error.message}`;
-        // Let MongoDB errors often be 503, but some like duplicate key might be 409
+        statusCode = 503;
         if (error.code === 11000) { 
-            errorMessage = 'Duplicate entry. A record with this identifier might already exist.';
-            errorDetails = error.message; // MongoError message is usually good for duplicates
+            errorMessage = 'Duplicate entry. This customer ID might already be registered.';
+            statusCode = 409;
         }
-    } else if (error instanceof Error) { // Standard JavaScript Error
-        errorDetails = error.message;
-    } else if (typeof error === 'string') { // If error is just a string
-        errorDetails = error;
-    } else { // Fallback for other types of errors
-        errorDetails = 'An unknown error structure was caught. Check server logs for the complete error object.';
     }
-    
-    const statusCode = (error instanceof MongoError && error.code === 11000) ? 409 : 503; // Default to 503 for DB issues, 409 for duplicate
-
-    const errorResponse = { success: false, message: errorMessage, details: errorDetails };
-    console.log(`API Route /register-customer: Constructing error response. Status: ${statusCode}, Payload:`, errorResponse);
-    return NextResponse.json(errorResponse, { status: statusCode });
+    return NextResponse.json({ success: false, message: errorMessage, details: error.message }, { status: statusCode });
   }
 }
+    

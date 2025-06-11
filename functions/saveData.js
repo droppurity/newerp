@@ -2,10 +2,9 @@
 // functions/saveData.js
 const { MongoClient } = require('mongodb');
 
-// Ensure MONGODB_URI and SECRET_KEY are set in Netlify environment variables
 const uri = process.env.MONGODB_URI;
 const secretKey = process.env.SECRET_KEY;
-const dbName = process.env.DB_NAME || 'droppurityDB'; // Or your specific DB name
+const dbName = process.env.DB_NAME || 'droppurityDB';
 
 let cachedDb = null;
 
@@ -26,104 +25,72 @@ async function connectToDatabase() {
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
-  // 1. Check HTTP Method
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ message: 'Method Not Allowed. Only POST is accepted.' }),
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return { statusCode: 405, body: JSON.stringify({ message: 'Method Not Allowed. Only POST is accepted.' }), headers: { 'Content-Type': 'application/json' } };
   }
 
-  // 2. Security Check: Authorization Header
   const authHeader = event.headers.authorization;
   if (!secretKey) {
     console.error('SECRET_KEY is not set in Netlify environment variables.');
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Server configuration error: API key not set.' }),
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return { statusCode: 500, body: JSON.stringify({ message: 'Server configuration error: API key not set.' }), headers: { 'Content-Type': 'application/json' } };
   }
   if (!authHeader || authHeader !== `Bearer ${secretKey}`) {
-    return {
-      statusCode: 401,
-      body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }),
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }), headers: { 'Content-Type': 'application/json' } };
   }
 
-  // 3. Parse Request Body
   let data;
   try {
     data = JSON.parse(event.body);
   } catch (error) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'Bad Request: Invalid JSON body.' }),
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return { statusCode: 400, body: JSON.stringify({ message: 'Bad Request: Invalid JSON body.' }), headers: { 'Content-Type': 'application/json' } };
   }
 
+  // ESP sends customerId (generatedId), dailyHours, totalHours
   const { customerId, dailyHours, totalHours } = data;
 
   if (!customerId || typeof dailyHours !== 'number' || typeof totalHours !== 'number') {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'Bad Request: Missing or invalid customerId, dailyHours, or totalHours.' }),
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return { statusCode: 400, body: JSON.stringify({ message: 'Bad Request: Missing or invalid customerId, dailyHours, or totalHours.' }), headers: { 'Content-Type': 'application/json' } };
   }
 
   try {
     const db = await connectToDatabase();
-    const collection = db.collection('recharge'); // Your specified collection name
+    const customersCollection = db.collection('customers'); 
 
     const newUsageEntry = {
       timestamp: new Date(),
       dailyHoursReported: dailyHours,
-      totalHoursReported: totalHours,
+      totalHoursReported: totalHours, // This is total for the ESP's current cycle
     };
 
-    const result = await collection.updateOne(
-      { customerId: customerId },
+    const result = await customersCollection.updateOne(
+      { generatedCustomerId: customerId }, // Find customer by generatedCustomerId
       {
         $set: {
-          currentTotalHours: totalHours, // Update the main current total hours
+          currentTotalHours: totalHours, // Update ESP's current cycle total hours
           lastContact: new Date(),
+          updatedAt: new Date()
         },
         $push: {
           lastUsage: {
             $each: [newUsageEntry],
-            $slice: -20 // Keep only the last 20 usage entries, adjust as needed
+            $slice: -50 // Keep only the last 50 usage entries to manage document size
           }
         }
       }
-      // If you want to create the customer document if it doesn't exist (e.g., first contact)
-      // you can add { upsert: true } as the third argument to updateOne.
-      // However, usually, a customer record would be created when they initially "recharge" or are set up.
-      // For now, assuming the record exists.
     );
 
     if (result.matchedCount === 0) {
-        // Optionally, if you want to create the record if it's missing:
-        // await collection.insertOne({
-        //   customerId: customerId,
-        //   currentTotalHours: totalHours,
-        //   lastUsage: [newUsageEntry],
-        //   maxHours: 0, // Default or fetch from a default plan
-        //   maxDays: 0,  // Default or fetch
-        //   rechargeDate: new Date(),
-        //   lastContact: new Date()
-        // });
-        // return { statusCode: 201, body: JSON.stringify({ message: 'Data saved (new customer record created).' }), headers: { 'Content-Type': 'application/json' }};
-      console.warn(`No customer found for ID: ${customerId} during saveData. Data not saved.`);
+      console.warn(`No customer found for generatedCustomerId: ${customerId} during saveData. Data not saved.`);
       return {
         statusCode: 404,
         body: JSON.stringify({ message: `Customer ID ${customerId} not found. Usage data not saved.` }),
         headers: { 'Content-Type': 'application/json' },
       };
     }
+    if (result.modifiedCount === 0 && result.matchedCount > 0) {
+        console.log(`Customer ${customerId} matched but not modified by saveData. Data might be identical or an issue with update logic.`);
+    }
+
 
     return {
       statusCode: 200,
@@ -139,3 +106,4 @@ exports.handler = async (event, context) => {
     };
   }
 };
+    

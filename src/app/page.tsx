@@ -23,12 +23,12 @@ const isAuthenticatedClientSide = () => {
 };
 
 interface ServiceJobNotification {
-    id: string; // Job's MongoDB _id
+    id: string; 
     customerName: string;
     mapLink: string | null;
     phone: string;
     problem: string;
-    createdAt: string; // ISO string date
+    createdAt: string; 
 }
 
 interface CustomerFromAPI {
@@ -36,8 +36,9 @@ interface CustomerFromAPI {
   customerName?: string;
   generatedCustomerId?: string;
   customerPhone?: string;
-  planEndDate?: string | null; // ISO string for plan end date
-  planName?: string; // Name of the current plan
+  planEndDate?: string | null; 
+  planName?: string; 
+  currentPlanName?: string; // Added for consistency
 }
 
 interface PlanExpiryNotification {
@@ -48,7 +49,7 @@ interface PlanExpiryNotification {
   planName: string;
   remainingDaysText: string;
   daysNumeric: number;
-  planEndDate: string; // Store for sorting
+  planEndDate: string; 
 }
 
 interface RemainingDaysInfo {
@@ -66,7 +67,8 @@ const calculateRemainingDays = (planEndDateString?: string | null, currentDate: 
   
   if (daysLeft < 0) return { text: 'Expired', isUrgent: true, daysNumeric: daysLeft };
   if (daysLeft === 0) return { text: 'Today', isUrgent: true, daysNumeric: 0 };
-  return { text: `${daysLeft} day${daysLeft !== 1 ? 's' : ''}`, isUrgent: daysLeft < 4, daysNumeric: daysLeft };
+  // Updated urgency for 3 days or less
+  return { text: `${daysLeft} day${daysLeft !== 1 ? 's' : ''}`, isUrgent: daysLeft <= 3, daysNumeric: daysLeft };
 };
 
 
@@ -102,21 +104,17 @@ export default function DropPurityPage() {
   const fetchAndProcessPlanExpiries = useCallback(async () => {
     setIsLoadingPlanExpiries(true);
     try {
-      const response = await fetch('/api/customers');
+      const response = await fetch('/api/customers'); // Fetches all customers
       if (!response.ok) {
         let errorDetails = `Network response was not ok. Status: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorDetails = errorData.details || errorData.message || JSON.stringify(errorData);
-        } catch (e) {
-          errorDetails = `Network response was not ok. Status: ${response.status} ${response.statusText}`;
-        }
-        throw new Error(`Failed to fetch customers for plan expiry checks: ${errorDetails}`);
+        try { const errorData = await response.json(); errorDetails = errorData.details || errorData.message || JSON.stringify(errorData); }
+        catch (e) { errorDetails = `Network response not ok. Status: ${response.status} ${response.statusText}`; }
+        throw new Error(`Failed to fetch customers for plan expiry: ${errorDetails}`);
       }
       const data = await response.json();
       if (data.success && Array.isArray(data.customers)) {
         const today = new Date();
-        const EXPIRY_THRESHOLD_DAYS = 7; // Notify for plans expiring in 7 days or less
+        const EXPIRY_THRESHOLD_DAYS = 3; // Notify for plans expiring in 3 days or less (or already expired)
 
         const expiries = data.customers
           .map((customer: CustomerFromAPI) => {
@@ -124,19 +122,19 @@ export default function DropPurityPage() {
             return { ...customer, remainingDaysInfo };
           })
           .filter((customer: CustomerFromAPI & { remainingDaysInfo: RemainingDaysInfo }) => 
-            customer.remainingDaysInfo.daysNumeric >= 0 && customer.remainingDaysInfo.daysNumeric <= EXPIRY_THRESHOLD_DAYS
+             customer.remainingDaysInfo.daysNumeric <= EXPIRY_THRESHOLD_DAYS // Includes expired (negative), today (0), and up to 3 days
           )
           .map((customer: CustomerFromAPI & { remainingDaysInfo: RemainingDaysInfo }): PlanExpiryNotification => ({
             customerId: customer._id,
             customerName: customer.customerName || 'N/A',
             customerGeneratedId: customer.generatedCustomerId || 'N/A',
             customerPhone: customer.customerPhone || 'N/A',
-            planName: customer.planName || 'Current Plan',
+            planName: customer.currentPlanName || customer.planName || 'Current Plan',
             remainingDaysText: customer.remainingDaysInfo.text,
             daysNumeric: customer.remainingDaysInfo.daysNumeric,
-            planEndDate: customer.planEndDate || new Date().toISOString(), // Fallback for sorting
+            planEndDate: customer.planEndDate || new Date().toISOString(), 
           }))
-          .sort((a, b) => a.daysNumeric - b.daysNumeric); // Sort by soonest expiring
+          .sort((a, b) => a.daysNumeric - b.daysNumeric); 
 
         setPlanExpiryNotifications(expiries);
       } else {
@@ -189,7 +187,7 @@ export default function DropPurityPage() {
         router.replace('/login');
       } else {
         setIsAuthenticating(false);
-        fetchAndProcessPlanExpiries(); // Fetch plan expiries after authentication
+        fetchAndProcessPlanExpiries(); 
       }
     }
   }, [router, isClient, fetchAndProcessPlanExpiries]);
@@ -223,8 +221,8 @@ export default function DropPurityPage() {
 
   const handleSendExpiryToWhatsApp = (notification: PlanExpiryNotification) => {
     const customerPhoneNumber = notification.customerPhone.replace(/\D/g, '');
-    const expiringInText = notification.daysNumeric === 0 ? "Today" : `in ${notification.remainingDaysText}`;
-    let message = `Dear ${notification.customerName} (ID: ${notification.customerGeneratedId}), your plan is expiring ${expiringInText}. Recharge for uninterrupted services.`;
+    const expiringInText = notification.daysNumeric < 0 ? "Expired" : (notification.daysNumeric === 0 ? "Today" : `in ${notification.remainingDaysText}`);
+    let message = `Dear ${notification.customerName} (ID: ${notification.customerGeneratedId}), your DropPurity plan "${notification.planName}" is ${expiringInText}. Please recharge soon for uninterrupted services. Contact us for assistance.`;
 
     const internationalPhoneNumber = customerPhoneNumber.startsWith('91') ? customerPhoneNumber : `91${customerPhoneNumber}`;
     const whatsappBaseUrl = /Mobi|Android/i.test(navigator.userAgent) ? 'wa.me' : 'web.whatsapp.com/send';
@@ -279,7 +277,7 @@ export default function DropPurityPage() {
                 <BellIcon className="mr-2 h-5 w-5 text-primary" />
                 Notifications
               </CardTitle>
-              <CardDescription>Recent service requests and plan expiry warnings.</CardDescription>
+              <CardDescription>Recent service requests and plan expiry warnings (within 3 days).</CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
               {/* Service Job Notifications */}
@@ -301,29 +299,11 @@ export default function DropPurityPage() {
                           <StickyNote className="inline-block mr-1.5 h-3.5 w-3.5 align-[-0.125em]" /> Problem: {notif.problem.length > 60 ? notif.problem.substring(0, 60) + "..." : notif.problem}
                         </p>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground items-center mt-1.5">
-                          {notif.mapLink && (
-                            <a href={notif.mapLink} target="_blank" rel="noopener noreferrer" className="flex items-center text-primary hover:underline">
-                              <MapPin className="mr-1 h-3 w-3" /> Map
-                              <ExternalLink className="ml-0.5 h-2.5 w-2.5" />
-                            </a>
-                          )}
-                          {notif.phone && (
-                            <a href={`tel:${notif.phone}`} className="flex items-center text-primary hover:underline">
-                              <Phone className="mr-1 h-3 w-3" /> {notif.phone}
-                            </a>
-                          )}
-                          <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => handleSendServiceJobToWhatsApp(notif)}
-                              className="h-auto py-0.5 px-1.5 text-xs"
-                          >
-                            <MessageCircle className="mr-1 h-3 w-3" /> WhatsApp
-                          </Button>
+                          {notif.mapLink && ( <a href={notif.mapLink} target="_blank" rel="noopener noreferrer" className="flex items-center text-primary hover:underline"><MapPin className="mr-1 h-3 w-3" /> Map<ExternalLink className="ml-0.5 h-2.5 w-2.5" /></a> )}
+                          {notif.phone && ( <a href={`tel:${notif.phone}`} className="flex items-center text-primary hover:underline"><Phone className="mr-1 h-3 w-3" /> {notif.phone}</a> )}
+                          <Button variant="outline" size="sm" onClick={() => handleSendServiceJobToWhatsApp(notif)} className="h-auto py-0.5 px-1.5 text-xs"><MessageCircle className="mr-1 h-3 w-3" /> WhatsApp</Button>
                         </div>
-                        <p className="text-xs text-muted-foreground/70 mt-1.5 text-right">
-                          Created {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
-                        </p>
+                        <p className="text-xs text-muted-foreground/70 mt-1.5 text-right">Created {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}</p>
                       </div>
                     ))}
                   </div>
@@ -334,55 +314,36 @@ export default function DropPurityPage() {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-lg font-semibold flex items-center">
-                    <CalendarClock className="mr-2 h-5 w-5 text-orange-500" /> Plan Expiry Warnings
+                    <CalendarClock className="mr-2 h-5 w-5 text-orange-500" /> Plan Expiry Warnings (3 Days)
                   </h3>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={fetchAndProcessPlanExpiries} 
-                    disabled={isLoadingPlanExpiries}
-                    className="h-auto py-1 px-2 text-xs"
-                  >
+                  <Button variant="outline" size="sm" onClick={fetchAndProcessPlanExpiries} disabled={isLoadingPlanExpiries} className="h-auto py-1 px-2 text-xs">
                     {isLoadingPlanExpiries ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
-                    {isLoadingPlanExpiries ? 'Refreshing...' : 'Retry'}
+                    {isLoadingPlanExpiries ? 'Refreshing...' : 'Refresh'}
                   </Button>
                 </div>
-                {isLoadingPlanExpiries ? (
-                  <div className="p-4 text-center"><Loader2 className="mx-auto h-8 w-8 text-primary animate-spin" /> <p className="text-sm text-muted-foreground mt-1">Loading expiry warnings...</p></div>
-                ) : planExpiryNotifications.length === 0 ? (
+                {isLoadingPlanExpiries ? ( <div className="p-4 text-center"><Loader2 className="mx-auto h-8 w-8 text-primary animate-spin" /> <p className="text-sm text-muted-foreground mt-1">Loading...</p></div>)
+                : planExpiryNotifications.length === 0 ? (
                   <div className="p-4 text-center border-2 border-dashed rounded-lg min-h-[80px] flex flex-col justify-center items-center">
                     <CalendarClock className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">No plans expiring soon.</p>
+                    <p className="text-sm text-muted-foreground">No plans expiring within 3 days.</p>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2">
                     {planExpiryNotifications.map(notif => (
-                      <div key={`expiry-${notif.customerId}`} className={`p-3 border rounded-lg bg-card shadow-sm relative hover:shadow-md transition-shadow ${notif.daysNumeric < 4 ? 'border-destructive/50' : ''}`}>
+                      <div key={`expiry-${notif.customerId}`} className={`p-3 border rounded-lg bg-card shadow-sm relative hover:shadow-md transition-shadow ${notif.daysNumeric < 1 ? 'border-destructive/70 bg-destructive/5' : (notif.daysNumeric <=3 ? 'border-orange-500/50 bg-orange-500/5' : '') }`}>
                         <h4 className="font-semibold text-primary-foreground mb-1">{notif.customerName} <span className="text-xs text-muted-foreground">({notif.customerGeneratedId})</span></h4>
-                        <p className={`text-sm mb-1 ${notif.daysNumeric < 4 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                        <p className={`text-sm mb-1 ${notif.daysNumeric < 1 ? 'text-destructive font-medium' : (notif.daysNumeric <=3 ? 'text-orange-600 dark:text-orange-400 font-medium' : 'text-muted-foreground')}`}>
                            Plan "{notif.planName}" expiring: {notif.remainingDaysText}
                         </p>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground items-center mt-1.5">
-                          {notif.customerPhone && (
-                            <a href={`tel:${notif.customerPhone}`} className="flex items-center text-primary hover:underline">
-                              <Phone className="mr-1 h-3 w-3" /> {notif.customerPhone}
-                            </a>
-                          )}
-                           <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => handleSendExpiryToWhatsApp(notif)}
-                              className="h-auto py-0.5 px-1.5 text-xs"
-                          >
-                            <MessageCircle className="mr-1 h-3 w-3" /> WhatsApp Reminder
-                          </Button>
+                          {notif.customerPhone && ( <a href={`tel:${notif.customerPhone}`} className="flex items-center text-primary hover:underline"><Phone className="mr-1 h-3 w-3" /> {notif.customerPhone}</a> )}
+                           <Button variant="outline" size="sm" onClick={() => handleSendExpiryToWhatsApp(notif)} className="h-auto py-0.5 px-1.5 text-xs"><MessageCircle className="mr-1 h-3 w-3" /> WhatsApp Reminder</Button>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-
             </CardContent>
           </Card>
 
@@ -405,3 +366,4 @@ export default function DropPurityPage() {
     </div>
   );
 }
+    

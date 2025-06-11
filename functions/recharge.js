@@ -25,81 +25,62 @@ async function connectToDatabase() {
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
-  // 1. Check HTTP Method
   if (event.httpMethod !== 'GET') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ message: 'Method Not Allowed. Only GET is accepted.' }),
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return { statusCode: 405, body: JSON.stringify({ message: 'Method Not Allowed. Only GET is accepted.' }), headers: { 'Content-Type': 'application/json' } };
   }
 
-  // 2. Security Check: Authorization Header
   const authHeader = event.headers.authorization;
    if (!secretKey) {
     console.error('SECRET_KEY is not set in Netlify environment variables.');
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Server configuration error: API key not set.' }),
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return { statusCode: 500, body: JSON.stringify({ message: 'Server configuration error: API key not set.' }), headers: { 'Content-Type': 'application/json' } };
   }
   if (!authHeader || authHeader !== `Bearer ${secretKey}`) {
-    return {
-      statusCode: 401,
-      body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }),
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }), headers: { 'Content-Type': 'application/json' } };
   }
 
-  // 3. Get customerId from query parameters
-  const customerId = event.queryStringParameters && event.queryStringParameters.customerId;
+  const customerId = event.queryStringParameters && event.queryStringParameters.customerId; // This is generatedCustomerId
 
   if (!customerId) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'Bad Request: customerId query parameter is required.' }),
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return { statusCode: 400, body: JSON.stringify({ message: 'Bad Request: customerId query parameter is required.' }), headers: { 'Content-Type': 'application/json' } };
   }
 
   try {
     const db = await connectToDatabase();
-    const collection = db.collection('recharge'); // Your specified collection name
+    const customersCollection = db.collection('customers'); 
 
-    const customerData = await collection.findOne({ customerId: customerId });
+    const customerData = await customersCollection.findOne({ generatedCustomerId: customerId });
 
     if (!customerData) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ message: `Customer with ID ${customerId} not found.` }),
+        body: JSON.stringify({ message: `Customer with generated ID ${customerId} not found.` }),
         headers: { 'Content-Type': 'application/json' },
       };
     }
 
     // Update last contact timestamp for this customer
-    await collection.updateOne(
-      { customerId: customerId },
-      { $set: { lastContact: new Date() } }
+    await customersCollection.updateOne(
+      { generatedCustomerId: customerId },
+      { $set: { lastContact: new Date(), updatedAt: new Date() } }
     );
 
+    // Return espCycleMaxHours and espCycleMaxDays from the customer's current plan details
     return {
       statusCode: 200,
       body: JSON.stringify({
-        customerId: customerData.customerId,
-        maxHours: customerData.maxHours, // Ensure these fields exist in your DB documents
-        maxDays: customerData.maxDays,   // Ensure these fields exist
-        // You could also return currentTotalHours if the ESP needs it for some reason
-        // currentTotalHours: customerData.currentTotalHours 
+        customerId: customerData.generatedCustomerId, // Echo back the ID
+        maxHours: customerData.espCycleMaxHours || 0, // Total hours for the ESP cycle
+        maxDays: customerData.espCycleMaxDays || 0,   // Days for the ESP cycle
       }),
       headers: { 'Content-Type': 'application/json' },
     };
   } catch (error) {
-    console.error('Error in recharge function:', error);
+    console.error('Error in recharge function (fetching limits for ESP):', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ message: 'Internal Server Error fetching recharge data.', details: error.message }),
+      body: JSON.stringify({ message: 'Internal Server Error fetching recharge data for ESP.', details: error.message }),
       headers: { 'Content-Type': 'application/json' },
     };
   }
 };
+    

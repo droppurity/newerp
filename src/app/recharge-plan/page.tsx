@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -27,16 +27,25 @@ interface Customer {
   customerName?: string;
   generatedCustomerId?: string;
   customerPhone?: string;
-  // Add other relevant customer fields you want to display
+  currentPlanId?: string;
+  currentPlanName?: string;
+  planPricePaid?: number;
+  planStartDate?: string; // ISO String
+  planEndDate?: string; // ISO String
+  espCycleMaxHours?: number;
+  espCycleMaxDays?: number;
+  lastRechargeDate?: string; // ISO String
+  rechargeCount?: number;
 }
 
-interface Plan {
+interface PlanFromAPI {
   _id: string;
   planId: string;
   planName: string;
   price: number;
-  dailyWaterLimitLiters: number;
   durationDays: number;
+  espCycleMaxHours?: number;
+  dailyWaterLimitLiters?: number;
 }
 
 export default function RechargePlanPage() {
@@ -49,17 +58,14 @@ export default function RechargePlanPage() {
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   
-  const [plansList, setPlansList] = useState<Plan[]>([]);
+  const [plansList, setPlansList] = useState<PlanFromAPI[]>([]);
   const [isLoadingPlans, setIsLoadingPlans] = useState<boolean>(true);
   const [planFetchError, setPlanFetchError] = useState<string | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [isRecharging, setIsRecharging] = useState<boolean>(false);
 
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  useEffect(() => { setIsClient(true); }, []);
 
   useEffect(() => {
     if (isClient) {
@@ -71,7 +77,6 @@ export default function RechargePlanPage() {
     }
   }, [router, isClient]);
 
-  // Fetch Plans
   useEffect(() => {
     if (isClient && !isAuthenticating) {
       const fetchPlans = async () => {
@@ -87,14 +92,13 @@ export default function RechargePlanPage() {
           if (data.success && Array.isArray(data.plans)) {
             setPlansList(data.plans);
             if (data.plans.length === 0) {
-               setPlanFetchError("No plans found in the database. Please ensure plans are initialized.");
+               setPlanFetchError("No plans found. Initialize plans at /api/initialize-collections.");
             }
           } else {
-            setPlanFetchError(data.message || 'Invalid plans data format received from /api/plans.');
+            setPlanFetchError(data.message || 'Invalid plans data from /api/plans.');
           }
         } catch (error: any) {
-          console.error("Error fetching plans:", error);
-          setPlanFetchError(error.message || "Could not retrieve service plans.");
+          setPlanFetchError(error.message || "Could not retrieve plans.");
           setPlansList([]); 
         } finally {
           setIsLoadingPlans(false);
@@ -105,137 +109,72 @@ export default function RechargePlanPage() {
   }, [isClient, isAuthenticating]);
 
   const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      sessionStorage.removeItem('isAuthenticated');
-    }
-    toast({ 
-      title: "Logged Out",
-      description: "You have been successfully logged out.",
-    });
+    if (typeof window !== "undefined") sessionStorage.removeItem('isAuthenticated');
+    toast({ title: "Logged Out", description: "Successfully logged out." });
     router.replace('/login');
   };
 
   const handleSearch = async () => {
     if (!searchTerm.trim() || searchTerm.trim().length < 3) {
-      toast({ 
-        variant: "default",
-        title: "Search Hint",
-        description: "Please enter at least 3 characters to search (name, ID, or phone).",
-      });
+      toast({ title: "Search Hint", description: "Enter at least 3 characters." });
       return;
     }
-
-    setIsSearching(true);
-    setFoundCustomer(null);
-    setSelectedPlanId(''); // Reset plan selection on new search
-    setPaymentMethod('');   // Reset payment method
-
+    setIsSearching(true); setFoundCustomer(null); setSelectedPlanId(''); setPaymentMethod('');
     try {
-      // Using /api/customers route with search parameter for consistency
       const response = await fetch(`/api/customers?search=${encodeURIComponent(searchTerm)}`);
       const data = await response.json();
-
       if (response.ok && data.success) {
         if (data.customers && data.customers.length > 0) {
-          setFoundCustomer(data.customers[0]); // Take the first match
-          toast({
-            title: "Customer Found",
-            description: `${data.customers[0].customerName} selected. You can now choose a plan.`,
-          });
-        } else { // data.customers is empty or not present
-          toast({
-              variant: "default", 
-              title: "Search Result",
-              description: `No customers found matching "${searchTerm}".`,
-          });
+          setFoundCustomer(data.customers[0]);
+          toast({ title: "Customer Found", description: `${data.customers[0].customerName} selected.` });
+        } else {
+          setFoundCustomer(null);
+          toast({ title: "Search Result", description: `No customers found for "${searchTerm}".` });
         }
-      } else { // Handle non-ok responses or success:false from API
-         toast({
-            variant: "destructive", 
-            title: "Search Failed",
-            description: data.message || `Failed to fetch customer data. Status: ${response.status}`,
-        });
+      } else {
+         setFoundCustomer(null);
+         toast({ variant: "destructive", title: "Search Failed", description: data.message || `Error: ${response.status}` });
       }
     } catch (error: any) {
-      toast({ 
-        variant: "destructive",
-        title: "Search Error",
-        description: error.message || "An unexpected error occurred during search.",
-      });
-      console.error('Actual search error object:', error);
+      setFoundCustomer(null);
+      toast({ variant: "destructive", title: "Search Error", description: error.message || "Unexpected search error." });
     } finally {
       setIsSearching(false);
     }
   };
 
   const handleRecharge = async () => {
-    if (!foundCustomer) {
-      toast({ variant: "destructive", title: "Error", description: "No customer selected." });
-      return;
-    }
-    if (!selectedPlanId) {
-      toast({ variant: "destructive", title: "Error", description: "Please select a plan." });
-      return;
-    }
-    if (!paymentMethod) {
-      toast({ variant: "destructive", title: "Error", description: "Please select a payment method." });
-      return;
-    }
-    if (isLoadingPlans || planFetchError) {
-      toast({ variant: "destructive", title: "Error", description: "Plans are not loaded correctly. Cannot proceed." });
-      return;
-    }
+    if (!foundCustomer) { toast({ variant: "destructive", title: "Error", description: "No customer selected." }); return; }
+    if (!selectedPlanId) { toast({ variant: "destructive", title: "Error", description: "Please select a plan." }); return; }
+    if (!paymentMethod) { toast({ variant: "destructive", title: "Error", description: "Please select a payment method." }); return; }
+    if (isLoadingPlans || planFetchError || plansList.length === 0) { toast({ variant: "destructive", title: "Error", description: "Plans not loaded or unavailable." }); return; }
 
     setIsRecharging(true);
     try {
-      const rechargeData = {
-        customerId: foundCustomer._id,
-        customerGeneratedId: foundCustomer.generatedCustomerId,
-        planId: selectedPlanId,
-        paymentMethod: paymentMethod,
-      };
-
+      const rechargeData = { customerId: foundCustomer._id, planId: selectedPlanId, paymentMethod };
       const response = await fetch('/api/recharge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rechargeData),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rechargeData),
       });
-
       const result = await response.json();
-
       if (response.ok && result.success) {
-        toast({
-          title: "Recharge Successful",
-          description: result.message || `Plan recharged for ${foundCustomer.customerName}.`,
-          variant: "success"
-        });
-        // Reset form after successful recharge
-        setFoundCustomer(null); 
-        setSelectedPlanId('');
-        setPaymentMethod('');
-        setSearchTerm(''); 
+        toast({ title: "Recharge Successful", description: result.message, variant: "success" });
+        setFoundCustomer(null); setSelectedPlanId(''); setPaymentMethod(''); setSearchTerm('');
       } else {
         throw new Error(result.message || 'Failed to process recharge.');
       }
-
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Recharge Failed",
-        description: error.message || "An unknown error occurred during recharge.",
-      });
+      toast({ variant: "destructive", title: "Recharge Failed", description: error.message || "Unknown recharge error." });
     } finally {
       setIsRecharging(false);
     }
   };
-
 
   if (!isClient || isAuthenticating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center">
           <Droplets className="h-12 w-12 text-primary animate-pulse mb-4" />
-          <p className="text-lg text-muted-foreground">Loading Recharge Plan Page...</p>
+          <p className="text-lg text-muted-foreground">Loading Recharge Page...</p>
         </div>
       </div>
     );
@@ -247,21 +186,10 @@ export default function RechargePlanPage() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-muted/10">
       <header className="p-4 sm:p-6 border-b sticky top-0 bg-background/95 backdrop-blur-sm z-10 shadow-sm">
         <div className="container mx-auto flex flex-wrap items-center justify-between gap-4">
-          <Link href="/" passHref>
-            <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center cursor-pointer">
-              <Droplets className="mr-2 h-7 w-7 sm:h-8 sm:w-8" /> DropPurity
-            </h1>
-          </Link>
+          <Link href="/" passHref><h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center cursor-pointer"><Droplets className="mr-2 h-7 w-7 sm:h-8 sm:w-8" /> DropPurity</h1></Link>
           <div className="flex items-center gap-2 sm:gap-4">
-             <Link href="/" passHref>
-              <Button variant="outline">
-                <LayoutDashboard className="mr-2 h-4 w-4" /> Back to Dashboard
-              </Button>
-            </Link>
-            <Button variant="outline" onClick={handleLogout} className="font-semibold">
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
+             <Link href="/" passHref><Button variant="outline"><LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard</Button></Link>
+            <Button variant="outline" onClick={handleLogout} className="font-semibold"><LogOut className="mr-2 h-4 w-4" />Logout</Button>
           </div>
         </div>
       </header>
@@ -269,28 +197,14 @@ export default function RechargePlanPage() {
       <main className="flex-grow container mx-auto p-4 sm:p-6">
         <Card className="shadow-lg rounded-xl overflow-hidden">
           <CardHeader>
-            <CardTitle className="flex items-center text-2xl">
-              <Zap className="mr-3 h-6 w-6 text-primary" />
-              Recharge Plan
-            </CardTitle>
+            <CardTitle className="flex items-center text-2xl"><Zap className="mr-3 h-6 w-6 text-primary" />Recharge Plan</CardTitle>
             <CardDescription>Search for a customer to recharge or renew their plan.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 p-6">
             <div className="flex items-center gap-4">
               <div className="relative flex-grow">
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search by name, ID, or phone (min 3 chars)"
-                  className="pl-10 w-full text-base"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      handleSearch();
-                    }
-                  }}
-                />
+                <Input type="text" placeholder="Search by name, ID, or phone (min 3 chars)" className="pl-10 w-full text-base" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSearch()} />
               </div>
               <Button onClick={handleSearch} disabled={isSearching || searchTerm.trim().length < 3}>
                 {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SearchIcon className="mr-2 h-4 w-4" />}
@@ -298,54 +212,33 @@ export default function RechargePlanPage() {
               </Button>
             </div>
 
-            {isSearching && (
-                 <div className="mt-6 text-center text-muted-foreground flex items-center justify-center p-6">
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Searching for customer...
-                </div>
-            )}
+            {isSearching && (<div className="mt-6 text-center text-muted-foreground flex items-center justify-center p-6"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Searching...</div>)}
 
             {foundCustomer && (
                 <Card className="mt-6 bg-muted/20 border-primary/30">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-xl flex items-center">
-                            <CheckCircle className="mr-2 h-5 w-5 text-green-500" /> Customer Found:
-                        </CardTitle>
-                    </CardHeader>
+                    <CardHeader className="pb-3"><CardTitle className="text-xl flex items-center"><CheckCircle className="mr-2 h-5 w-5 text-green-500" /> Customer Found:</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                         <div>
                             <p><strong>Name:</strong> {foundCustomer.customerName || 'N/A'}</p>
-                            <p><strong>Customer ID:</strong> {foundCustomer.generatedCustomerId || 'N/A'}</p>
+                            <p><strong>ID:</strong> {foundCustomer.generatedCustomerId || 'N/A'}</p>
                             <p><strong>Phone:</strong> {foundCustomer.customerPhone || 'N/A'}</p>
+                            <p><strong>Current Plan:</strong> {foundCustomer.currentPlanName || 'N/A'}</p>
+                            <p><strong>Plan Ends:</strong> {foundCustomer.planEndDate ? new Date(foundCustomer.planEndDate).toLocaleDateString() : 'N/A'}</p>
                         </div>
                         
                         <div className="space-y-2">
-                            <Label htmlFor="planSelect" className="flex items-center text-md"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Select Plan</Label>
-                            {isLoadingPlans ? (
-                                <div className="flex items-center text-muted-foreground p-2 border rounded-md bg-background">
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading plans...
-                                </div>
-                            ) : planFetchError ? (
-                                <Alert variant="destructive" className="mt-2">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertTitle>Plan Loading Error</AlertTitle>
-                                    <AlertDescription>
-                                      {planFetchError}
-                                      <Button variant="link" asChild className="p-0 h-auto font-medium text-destructive hover:underline block mt-1">
-                                        <Link href="/api/initialize-collections" target="_blank">Try Initializing Collections</Link>
-                                      </Button>
-                                    </AlertDescription>
-                                </Alert>
-                            ) : plansList.length === 0 ? (
-                                <p className="text-sm text-muted-foreground p-2 border rounded-md bg-background">No plans available to select. Please ensure plans are configured.</p>
-                            ) : (
+                            <Label htmlFor="planSelect" className="flex items-center text-md"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Select New Plan</Label>
+                            {isLoadingPlans ? (<div className="flex items-center text-muted-foreground p-2 border rounded-md bg-background"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...</div>)
+                            : planFetchError ? (<Alert variant="destructive" className="mt-2"><AlertCircle className="h-4 w-4" /><AlertTitle>Plan Error</AlertTitle><AlertDescription>{planFetchError}</AlertDescription></Alert>)
+                            : plansList.length === 0 ? (<p className="text-sm text-muted-foreground p-2 border rounded-md bg-background">No plans available.</p>)
+                            : (
                                 <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                                    <SelectTrigger id="planSelect" className="w-full md:w-[400px] bg-background">
-                                        <SelectValue placeholder="Choose a plan" />
-                                    </SelectTrigger>
+                                    <SelectTrigger id="planSelect" className="w-full md:w-[400px] bg-background"><SelectValue placeholder="Choose a plan" /></SelectTrigger>
                                     <SelectContent>
                                         {plansList.map(plan => (
                                             <SelectItem key={plan.planId} value={plan.planId}>
-                                                {plan.planName} - ₹{plan.price} ({plan.durationDays} days, {plan.dailyWaterLimitLiters}L/day)
+                                                {plan.planName} - ₹{plan.price} ({plan.durationDays} days
+                                                {plan.espCycleMaxHours ? `, ${plan.espCycleMaxHours}hrs` : ''})
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -355,62 +248,40 @@ export default function RechargePlanPage() {
 
                         {selectedPlanDetails && (
                           <div className="p-3 bg-primary/10 rounded-md text-sm border border-primary/30">
-                            <p className="font-semibold text-primary-foreground">Selected Plan Details:</p>
+                            <p className="font-semibold text-primary-foreground">Selected Plan:</p>
                             <p><strong>Name:</strong> {selectedPlanDetails.planName}</p>
                             <p><strong>Price:</strong> ₹{selectedPlanDetails.price}</p>
                             <p><strong>Duration:</strong> {selectedPlanDetails.durationDays} days</p>
-                            <p><strong>Daily Limit:</strong> {selectedPlanDetails.dailyWaterLimitLiters} Liters/day</p>
+                            {selectedPlanDetails.espCycleMaxHours && <p><strong>Max Usage:</strong> {selectedPlanDetails.espCycleMaxHours} hours</p>}
                           </div>
                         )}
 
                         <div className="space-y-2">
                              <Label htmlFor="paymentMethodSelect" className="flex items-center text-md"><Banknote className="mr-2 h-5 w-5 text-primary"/>Payment Method</Label>
                              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                                <SelectTrigger id="paymentMethodSelect" className="w-full md:w-[300px] bg-background">
-                                    <SelectValue placeholder="Select payment method" />
-                                </SelectTrigger>
+                                <SelectTrigger id="paymentMethodSelect" className="w-full md:w-[300px] bg-background"><SelectValue placeholder="Select payment" /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Online">Online</SelectItem>
-                                    <SelectItem value="Cash">Cash</SelectItem>
-                                    <SelectItem value="Card">Card</SelectItem>
-                                    <SelectItem value="Other">Other</SelectItem>
+                                    <SelectItem value="Online">Online</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Card">Card</SelectItem><SelectItem value="Other">Other</SelectItem>
                                 </SelectContent>
                              </Select>
                         </div>
-                        <Button 
-                            onClick={handleRecharge} 
-                            disabled={!selectedPlanId || !paymentMethod || isRecharging || isLoadingPlans || !!planFetchError} 
-                            className="w-full sm:w-auto"
-                        >
+                        <Button onClick={handleRecharge} disabled={!selectedPlanId || !paymentMethod || isRecharging || isLoadingPlans || !!planFetchError || plansList.length === 0} className="w-full sm:w-auto">
                             {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
-                            {isRecharging ? 'Processing Recharge...' : 'Confirm Recharge'}
+                            {isRecharging ? 'Processing...' : 'Confirm Recharge'}
                         </Button>
                     </CardContent>
                 </Card>
             )}
             
-            {!isSearching && !foundCustomer && searchTerm.trim().length >= 3 && (
-                 <div className="mt-6 text-center text-muted-foreground p-6 border-2 border-dashed rounded-lg">
-                    <SearchIcon className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                    No customer found matching "{searchTerm}". Please try a different search term.
-                </div>
-            )}
-
-             {!isSearching && !foundCustomer && searchTerm.trim().length < 3 && (
-                 <div className="mt-6 text-center text-muted-foreground p-6 border-2 border-dashed rounded-lg">
-                     <SearchIcon className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                    Enter at least 3 characters of a customer's name, ID, or phone number to search.
-                </div>
-            )}
-
-
+            {!isSearching && !foundCustomer && searchTerm.trim().length >= 3 && (<div className="mt-6 text-center text-muted-foreground p-6 border-2 border-dashed rounded-lg"><SearchIcon className="mx-auto h-8 w-8 text-muted-foreground mb-2" />No customer found for "{searchTerm}".</div>)}
+            {!isSearching && !foundCustomer && searchTerm.trim().length < 3 && (<div className="mt-6 text-center text-muted-foreground p-6 border-2 border-dashed rounded-lg"><SearchIcon className="mx-auto h-8 w-8 text-muted-foreground mb-2" />Enter at least 3 characters to search.</div>)}
           </CardContent>
         </Card>
       </main>
-
       <footer className="text-center p-4 border-t text-sm text-muted-foreground mt-auto">
         © {new Date().getFullYear()} DropPurity. All rights reserved.
       </footer>
     </div>
   );
 }
+    
