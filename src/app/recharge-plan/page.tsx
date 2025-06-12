@@ -210,7 +210,7 @@ export default function RechargePlanPage() {
     if (isCurrentPlanActive) {
       setRechargeConfirmationDetails({
         currentPlanName: foundCustomer.currentPlanName || "Active Plan",
-        currentPlanEndDate: format(currentPlanEndDate, "PPP"),
+        currentPlanEndDate: currentPlanEndDate ? format(currentPlanEndDate, "PPP") : "N/A",
         newPlanName: newSelectedPlanDetails.planName,
         newPlanPrice: newSelectedPlanDetails.price,
         newPlanDurationDays: newSelectedPlanDetails.durationDays,
@@ -337,21 +337,21 @@ export default function RechargePlanPage() {
                     Active Plan Warning
                   </AlertDialogTitle>
                   <AlertDialogDescription className="space-y-3 pt-2">
-                    <p>This customer already has an active plan:</p>
+                    <div>This customer already has an active plan:</div>
                     <div className="p-3 bg-orange-50 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-md text-sm">
-                        <p><strong>Current Plan:</strong> {rechargeConfirmationDetails?.currentPlanName}</p>
-                        <p><strong>Ends On:</strong> {rechargeConfirmationDetails?.currentPlanEndDate}</p>
+                        <div><strong>Current Plan:</strong> {rechargeConfirmationDetails?.currentPlanName}</div>
+                        <div><strong>Ends On:</strong> {rechargeConfirmationDetails?.currentPlanEndDate}</div>
                     </div>
-                    <p>Recharging with the new plan:</p>
+                    <div>Recharging with the new plan:</div>
                     <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-md text-sm">
-                        <p><strong>New Plan:</strong> {rechargeConfirmationDetails?.newPlanName}</p>
-                        <p><strong>Price:</strong> ₹{rechargeConfirmationDetails?.newPlanPrice}</p>
-                        <p><strong>Duration:</strong> {rechargeConfirmationDetails?.newPlanDurationDays} days</p>
+                        <div><strong>New Plan:</strong> {rechargeConfirmationDetails?.newPlanName}</div>
+                        <div><strong>Price:</strong> ₹{rechargeConfirmationDetails?.newPlanPrice}</div>
+                        <div><strong>Duration:</strong> {rechargeConfirmationDetails?.newPlanDurationDays} days</div>
                     </div>
-                    <p className="font-semibold">
+                    <div className="font-semibold">
                       Proceeding will start the new plan immediately, effectively replacing the current active plan.
-                    </p>
-                    Are you sure you want to continue?
+                    </div>
+                    <div>Are you sure you want to continue?</div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
