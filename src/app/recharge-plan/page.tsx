@@ -19,7 +19,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  // AlertDialogDescription, // No longer directly used if children are block-level
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -343,7 +343,7 @@ export default function RechargePlanPage() {
                     <AlertTriangle className="h-6 w-6 mr-2 text-orange-500" />
                     Active Plan Detected
                   </AlertDialogTitle>
-                  <AlertDialogDescription className="space-y-3 pt-2">
+                  <div className="text-sm text-muted-foreground space-y-3 pt-2">
                     <div>Customer <span className="font-semibold">{foundCustomer?.customerName}</span> has an active plan:</div>
                     <div className="p-3 bg-orange-50 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-md text-sm">
                         <div><strong>Current Plan:</strong> {rechargeConfirmationDetails?.currentPlanName}</div>
@@ -356,7 +356,7 @@ export default function RechargePlanPage() {
                         <div><strong>Duration:</strong> {rechargeConfirmationDetails?.newPlanDurationDays} days</div>
                     </div>
                     <div className="font-semibold">How would you like to apply the new plan?</div>
-                  </AlertDialogDescription>
+                  </div>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="sm:justify-between gap-2">
                   <AlertDialogCancel onClick={() => setShowRechargeConfirmationDialog(false)} disabled={isRecharging}>Cancel</AlertDialogCancel>
@@ -383,3 +383,5 @@ export default function RechargePlanPage() {
     </div>
   );
 }
+
+    
