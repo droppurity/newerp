@@ -49,12 +49,47 @@ const ensureIsoString = (dateValue: any): string | null => {
   if (dateValue instanceof Date) return dateValue.toISOString();
   try {
     const parsedDate = new Date(dateValue);
-    if (isNaN(parsedDate.getTime())) return dateValue.toString(); // Fallback to original string if invalid
+    // Check if the original string might have been just a date part, adjust for timezone if needed
+    // For simplicity, if it's just a date string like "YYYY-MM-DD", parseISO will handle it well.
+    if (isNaN(parsedDate.getTime())) {
+        // Attempt to re-parse if it looks like a date string missing time info
+        // This might not be strictly necessary if all dates are stored as BSON Dates in MongoDB
+        const reParsedDate = new Date(dateValue + "T00:00:00Z"); // Assume UTC if only date part
+        if (isNaN(reParsedDate.getTime())) return dateValue.toString(); // Fallback
+        return reParsedDate.toISOString();
+    }
     return parsedDate.toISOString();
   } catch (e) {
     return dateValue.toString(); // Fallback if Date constructor throws
   }
 };
+
+const serializeCustomerDocument = (customer: any) => {
+  if (!customer) return null;
+  const serializableCustomer = { ...customer };
+  serializableCustomer._id = customer._id.toString();
+  
+  const dateFields = [
+    'registeredAt', 'installationDate', 'planStartDate', 'planEndDate', 
+    'lastRechargeDate', 'lastContact', 'updatedAt'
+  ];
+
+  dateFields.forEach(field => {
+    if (serializableCustomer[field]) {
+      serializableCustomer[field] = ensureIsoString(serializableCustomer[field]);
+    }
+  });
+
+  if (serializableCustomer.lastUsage && Array.isArray(serializableCustomer.lastUsage)) {
+    serializableCustomer.lastUsage = serializableCustomer.lastUsage.map((usage: any) => ({
+      ...usage,
+      timestamp: ensureIsoString(usage.timestamp),
+    }));
+  }
+
+  return serializableCustomer;
+};
+
 
 export async function GET(request: NextRequest, { params }: { params: { customerId: string } }) {
   const { customerId } = params;
@@ -72,20 +107,10 @@ export async function GET(request: NextRequest, { params }: { params: { customer
     if (!customer) {
       return NextResponse.json({ success: false, message: 'Customer not found' }, { status: 404 });
     }
-
-    // Convert ObjectId to string and handle dates for JSON serialization
-    const serializableCustomer = {
-      ...customer,
-      _id: customer._id.toString(),
-      registeredAt: ensureIsoString(customer.registeredAt),
-      installationDate: ensureIsoString(customer.installationDate),
-      planStartDate: ensureIsoString(customer.planStartDate),
-      planEndDate: ensureIsoString(customer.planEndDate),
-      lastRechargeDate: ensureIsoString(customer.lastRechargeDate),
-      // Ensure any other date fields stored as Date objects are also converted to ISOString
-    };
     
-    return NextResponse.json({ success: true, customer: serializableCustomer }, { status: 200 });
+    const finalCustomerData = serializeCustomerDocument(customer);
+    
+    return NextResponse.json({ success: true, customer: finalCustomerData }, { status: 200 });
 
   } catch (error: any) {
     console.error(`API Route Error in /api/customers/${customerId} GET handler:`, error);
