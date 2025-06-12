@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { 
-  Droplets, LogOut, Search as SearchIcon, Zap, LayoutDashboard, Loader2, AlertCircle, ListChecks, Banknote, CheckCircle
+  Droplets, LogOut, Search as SearchIcon, Zap, LayoutDashboard, Loader2, AlertCircle, ListChecks, Banknote, CheckCircle, AlertTriangle
 } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { parseISO, isFuture, format } from 'date-fns';
 
 const isAuthenticatedClientSide = () => {
   if (typeof window !== "undefined") {
@@ -48,6 +59,14 @@ interface PlanFromAPI {
   dailyWaterLimitLiters?: number;
 }
 
+interface RechargeConfirmationDetails {
+  currentPlanName?: string;
+  currentPlanEndDate?: string;
+  newPlanName?: string;
+  newPlanPrice?: number;
+  newPlanDurationDays?: number;
+}
+
 export default function RechargePlanPage() {
   const router = useRouter();
   const { toast } = useToast(); 
@@ -64,6 +83,9 @@ export default function RechargePlanPage() {
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [isRecharging, setIsRecharging] = useState<boolean>(false);
+
+  const [showRechargeConfirmationDialog, setShowRechargeConfirmationDialog] = useState(false);
+  const [rechargeConfirmationDetails, setRechargeConfirmationDetails] = useState<RechargeConfirmationDetails | null>(null);
 
   useEffect(() => { setIsClient(true); }, []);
 
@@ -125,7 +147,7 @@ export default function RechargePlanPage() {
       const data = await response.json();
       if (response.ok && data.success) {
         if (data.customers && data.customers.length > 0) {
-          setFoundCustomer(data.customers[0]);
+          setFoundCustomer(data.customers[0]); // Select the first customer found
           toast({ title: "Customer Found", description: `${data.customers[0].customerName} selected.` });
         } else {
           setFoundCustomer(null);
@@ -142,13 +164,13 @@ export default function RechargePlanPage() {
       setIsSearching(false);
     }
   };
-
-  const handleRecharge = async () => {
-    if (!foundCustomer) { toast({ variant: "destructive", title: "Error", description: "No customer selected." }); return; }
-    if (!selectedPlanId) { toast({ variant: "destructive", title: "Error", description: "Please select a plan." }); return; }
-    if (!paymentMethod) { toast({ variant: "destructive", title: "Error", description: "Please select a payment method." }); return; }
-    if (isLoadingPlans || planFetchError || plansList.length === 0) { toast({ variant: "destructive", title: "Error", description: "Plans not loaded or unavailable." }); return; }
-
+  
+  const proceedWithRecharge = async () => {
+    if (!foundCustomer || !selectedPlanId || !paymentMethod) {
+        toast({ variant: "destructive", title: "Error", description: "Missing customer, plan, or payment method details." });
+        setIsRecharging(false); // Ensure isRecharging is reset
+        return;
+    }
     setIsRecharging(true);
     try {
       const rechargeData = { customerId: foundCustomer._id, planId: selectedPlanId, paymentMethod };
@@ -166,8 +188,39 @@ export default function RechargePlanPage() {
       toast({ variant: "destructive", title: "Recharge Failed", description: error.message || "Unknown recharge error." });
     } finally {
       setIsRecharging(false);
+      setShowRechargeConfirmationDialog(false);
     }
   };
+
+  const handleRechargeAttempt = () => {
+    if (!foundCustomer) { toast({ variant: "destructive", title: "Error", description: "No customer selected." }); return; }
+    if (!selectedPlanId) { toast({ variant: "destructive", title: "Error", description: "Please select a plan." }); return; }
+    if (!paymentMethod) { toast({ variant: "destructive", title: "Error", description: "Please select a payment method." }); return; }
+    if (isLoadingPlans || planFetchError || plansList.length === 0) { toast({ variant: "destructive", title: "Error", description: "Plans not loaded or unavailable." }); return; }
+
+    const newSelectedPlanDetails = plansList.find(p => p.planId === selectedPlanId);
+    if (!newSelectedPlanDetails) {
+      toast({ variant: "destructive", title: "Error", description: "Selected plan details not found." });
+      return;
+    }
+
+    const currentPlanEndDate = foundCustomer.planEndDate ? parseISO(foundCustomer.planEndDate) : null;
+    const isCurrentPlanActive = currentPlanEndDate && isFuture(currentPlanEndDate);
+
+    if (isCurrentPlanActive) {
+      setRechargeConfirmationDetails({
+        currentPlanName: foundCustomer.currentPlanName || "Active Plan",
+        currentPlanEndDate: format(currentPlanEndDate, "PPP"),
+        newPlanName: newSelectedPlanDetails.planName,
+        newPlanPrice: newSelectedPlanDetails.price,
+        newPlanDurationDays: newSelectedPlanDetails.durationDays,
+      });
+      setShowRechargeConfirmationDialog(true);
+    } else {
+      proceedWithRecharge();
+    }
+  };
+
 
   if (!isClient || isAuthenticating) {
     return (
@@ -248,7 +301,7 @@ export default function RechargePlanPage() {
 
                         {selectedPlanDetails && (
                           <div className="p-3 bg-primary/10 rounded-md text-sm border border-primary/30">
-                            <p className="font-semibold text-primary-foreground">Selected Plan:</p>
+                            <p className="font-semibold text-primary-foreground">Selected Plan for New Recharge:</p>
                             <p><strong>Name:</strong> {selectedPlanDetails.planName}</p>
                             <p><strong>Price:</strong> ₹{selectedPlanDetails.price}</p>
                             <p><strong>Duration:</strong> {selectedPlanDetails.durationDays} days</p>
@@ -265,7 +318,7 @@ export default function RechargePlanPage() {
                                 </SelectContent>
                              </Select>
                         </div>
-                        <Button onClick={handleRecharge} disabled={!selectedPlanId || !paymentMethod || isRecharging || isLoadingPlans || !!planFetchError || plansList.length === 0} className="w-full sm:w-auto">
+                        <Button onClick={handleRechargeAttempt} disabled={!selectedPlanId || !paymentMethod || isRecharging || isLoadingPlans || !!planFetchError || plansList.length === 0} className="w-full sm:w-auto">
                             {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
                             {isRecharging ? 'Processing...' : 'Confirm Recharge'}
                         </Button>
@@ -275,6 +328,42 @@ export default function RechargePlanPage() {
             
             {!isSearching && !foundCustomer && searchTerm.trim().length >= 3 && (<div className="mt-6 text-center text-muted-foreground p-6 border-2 border-dashed rounded-lg"><SearchIcon className="mx-auto h-8 w-8 text-muted-foreground mb-2" />No customer found for "{searchTerm}".</div>)}
             {!isSearching && !foundCustomer && searchTerm.trim().length < 3 && (<div className="mt-6 text-center text-muted-foreground p-6 border-2 border-dashed rounded-lg"><SearchIcon className="mx-auto h-8 w-8 text-muted-foreground mb-2" />Enter at least 3 characters to search.</div>)}
+          
+            <AlertDialog open={showRechargeConfirmationDialog} onOpenChange={setShowRechargeConfirmationDialog}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center">
+                    <AlertTriangle className="h-6 w-6 mr-2 text-orange-500" />
+                    Active Plan Warning
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-3 pt-2">
+                    <p>This customer already has an active plan:</p>
+                    <div className="p-3 bg-orange-50 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-md text-sm">
+                        <p><strong>Current Plan:</strong> {rechargeConfirmationDetails?.currentPlanName}</p>
+                        <p><strong>Ends On:</strong> {rechargeConfirmationDetails?.currentPlanEndDate}</p>
+                    </div>
+                    <p>Recharging with the new plan:</p>
+                    <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-md text-sm">
+                        <p><strong>New Plan:</strong> {rechargeConfirmationDetails?.newPlanName}</p>
+                        <p><strong>Price:</strong> ₹{rechargeConfirmationDetails?.newPlanPrice}</p>
+                        <p><strong>Duration:</strong> {rechargeConfirmationDetails?.newPlanDurationDays} days</p>
+                    </div>
+                    <p className="font-semibold">
+                      Proceeding will start the new plan immediately, effectively replacing the current active plan.
+                    </p>
+                    Are you sure you want to continue?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setShowRechargeConfirmationDialog(false)} disabled={isRecharging}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={proceedWithRecharge} disabled={isRecharging} className="bg-primary hover:bg-primary/90">
+                    {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isRecharging ? 'Processing...' : 'Yes, Proceed with Recharge'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
           </CardContent>
         </Card>
       </main>
@@ -284,4 +373,4 @@ export default function RechargePlanPage() {
     </div>
   );
 }
-    
+
