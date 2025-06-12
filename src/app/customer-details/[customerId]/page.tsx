@@ -2,20 +2,38 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback, use } from 'react'; // Added 'use' import
+import React, { useEffect, useState, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { format, parseISO, isValid as isValidDate, formatDistanceToNow } from 'date-fns';
+import { format, parseISO, isValid as isValidDate, formatDistanceToNow, isFuture, addDays as dateFnsAddDays } from 'date-fns';
 import { cn } from "@/lib/utils";
+
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from '@/components/ui/input'; // Added for search if ever needed here
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 import {
   AlertCircle, User, MapPin, Phone as PhoneIcon, Mail, Home, Briefcase, Droplet,
   FileText, CalendarDays, Clock, Tag, ShieldCheck, BarChart3, Users,
   Building, Hash, CircleDollarSign, Wrench, Receipt, LogOut, ArrowLeft, LinkIcon, ExternalLink, Droplets as AppIcon,
-  RotateCcwIcon, History, Wifi, Activity, Hourglass, ListRestart
+  RotateCcwIcon, History, Wifi, Activity, Hourglass, ListRestart, Zap, Loader2, ListChecks, Banknote,
+  PlusSquare, Replace, Search as SearchIcon // Added Zap, Loader2, ListChecks, Banknote, PlusSquare, Replace
 } from 'lucide-react';
 
 interface LastUsageEntry {
@@ -104,6 +122,27 @@ interface DetailItemProps {
   className?: string;
 }
 
+interface PlanFromAPI {
+  _id: string;
+  planId: string;
+  planName: string;
+  price: number;
+  durationDays: number;
+  espCycleMaxHours?: number;
+  dailyWaterLimitLiters?: number;
+}
+
+interface RechargeConfirmationDetails {
+  currentPlanName?: string;
+  currentPlanEndDate?: string;
+  newPlanName?: string;
+  newPlanPrice?: number;
+  newPlanDurationDays?: number;
+  newPlanMaxHours?: number;
+  newPlanMaxLiters?: number;
+}
+
+
 const DetailItem: React.FC<DetailItemProps> = ({
     icon: Icon, label, value, isLink, isDate, isBoolean, isCurrency, isTel,
     isDateTime, isRelativeTime, currencySymbol = '₹', children, className
@@ -159,10 +198,10 @@ const DetailItem: React.FC<DetailItemProps> = ({
 };
 
 
-export default function CustomerDetailsPage({ params: paramsPromise }: { params: Promise<{ customerId: string }> }) {
+export default function CustomerDetailsPage({ params }: { params: { customerId: string } }) {
   const router = useRouter();
-  const resolvedParams = use(paramsPromise);
-  const customerId = resolvedParams.customerId;
+  const { toast } = useToast();
+  const customerId = params.customerId;
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -171,6 +210,16 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
   const [rechargeHistory, setRechargeHistory] = useState<RechargeHistoryItem[]>([]);
   const [isLoadingRechargeHistory, setIsLoadingRechargeHistory] = useState(true);
   const [rechargeHistoryError, setRechargeHistoryError] = useState<string | null>(null);
+
+  // State for embedded recharge functionality
+  const [plansList, setPlansList] = useState<PlanFromAPI[]>([]);
+  const [isLoadingPlans, setIsLoadingPlans] = useState<boolean>(true);
+  const [planFetchError, setPlanFetchError] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
+  const [isRecharging, setIsRecharging] = useState<boolean>(false);
+  const [showRechargeConfirmationDialog, setShowRechargeConfirmationDialog] = useState(false);
+  const [rechargeConfirmationDetails, setRechargeConfirmationDetails] = useState<RechargeConfirmationDetails | null>(null);
 
 
   const fetchCustomerDetails = useCallback(async () => {
@@ -221,10 +270,37 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
     }
   }, [customerId]);
 
+  const fetchPlans = useCallback(async () => {
+    setIsLoadingPlans(true);
+    setPlanFetchError(null);
+    try {
+      const response = await fetch('/api/plans');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Failed to fetch plans: ${response.statusText}` }));
+        throw new Error(errorData.message || `Failed to fetch plans: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.success && Array.isArray(data.plans)) {
+        setPlansList(data.plans);
+        if (data.plans.length === 0) {
+           setPlanFetchError("No plans found. Initialize plans at /api/initialize-collections.");
+        }
+      } else {
+        setPlanFetchError(data.message || 'Invalid plans data from /api/plans.');
+      }
+    } catch (error: any) {
+      setPlanFetchError(error.message || "Could not retrieve plans.");
+      setPlansList([]); 
+    } finally {
+      setIsLoadingPlans(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchCustomerDetails();
     fetchRechargeHistory();
-  }, [fetchCustomerDetails, fetchRechargeHistory]);
+    fetchPlans();
+  }, [fetchCustomerDetails, fetchRechargeHistory, fetchPlans]);
 
   const handleLogout = () => {
     if (typeof window !== "undefined") {
@@ -232,6 +308,78 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
     }
     router.replace('/login');
   };
+
+  const proceedWithRecharge = async (rechargeType: 'replace' | 'add') => {
+    if (!customer || !selectedPlanId || !paymentMethod) {
+        toast({ variant: "destructive", title: "Error", description: "Missing customer, plan, or payment method details." });
+        setIsRecharging(false); 
+        setShowRechargeConfirmationDialog(false);
+        return;
+    }
+    setIsRecharging(true);
+    try {
+      const rechargeData = { 
+        customerId: customer._id, 
+        planId: selectedPlanId, 
+        paymentMethod,
+        rechargeType 
+      };
+      const response = await fetch('/api/recharge', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rechargeData),
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        toast({ title: "Recharge Successful", description: result.message, variant: "success" });
+        setSelectedPlanId(''); 
+        setPaymentMethod('');
+        // Re-fetch customer details and recharge history to update the page
+        fetchCustomerDetails();
+        fetchRechargeHistory();
+      } else {
+        throw new Error(result.message || 'Failed to process recharge.');
+      }
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Recharge Failed", description: error.message || "Unknown recharge error." });
+    } finally {
+      setIsRecharging(false);
+      setShowRechargeConfirmationDialog(false);
+    }
+  };
+
+  const handleRechargeAttempt = () => {
+    if (!customer) { toast({ variant: "destructive", title: "Error", description: "Customer data not loaded." }); return; }
+    if (!selectedPlanId) { toast({ variant: "destructive", title: "Error", description: "Please select a plan." }); return; }
+    if (!paymentMethod) { toast({ variant: "destructive", title: "Error", description: "Please select a payment method." }); return; }
+    if (isLoadingPlans || planFetchError || plansList.length === 0) { toast({ variant: "destructive", title: "Error", description: "Plans not loaded or unavailable." }); return; }
+
+    const newSelectedPlanDetails = plansList.find(p => p.planId === selectedPlanId);
+    if (!newSelectedPlanDetails) {
+      toast({ variant: "destructive", title: "Error", description: "Selected plan details not found." });
+      return;
+    }
+
+    const currentPlanEndDate = customer.planEndDate ? parseISO(customer.planEndDate) : null;
+    const isCurrentPlanActive = currentPlanEndDate && isFuture(currentPlanEndDate);
+
+    setRechargeConfirmationDetails({
+      currentPlanName: customer.currentPlanName || "N/A",
+      currentPlanEndDate: currentPlanEndDate ? format(currentPlanEndDate, "PPP") : "N/A",
+      newPlanName: newSelectedPlanDetails.planName,
+      newPlanPrice: newSelectedPlanDetails.price,
+      newPlanDurationDays: newSelectedPlanDetails.durationDays,
+      newPlanMaxHours: newSelectedPlanDetails.espCycleMaxHours,
+      newPlanMaxLiters: newSelectedPlanDetails.dailyWaterLimitLiters,
+    });
+
+    if (isCurrentPlanActive) {
+      setShowRechargeConfirmationDialog(true);
+    } else {
+      proceedWithRecharge('replace'); 
+    }
+  };
+
+  const selectedPlanForDisplay = plansList.find(p => p.planId === selectedPlanId);
+
 
   if (isLoading) {
     return (
@@ -273,7 +421,7 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
              <div className="flex items-center"> <User className="h-8 w-8 text-primary mr-3" /> <CardTitle className="text-2xl sm:text-3xl">{customer.customerName || 'Customer Details'}</CardTitle> </div>
              {customer.generatedCustomerId && <p className="text-sm text-muted-foreground pt-1">Customer ID: {customer.generatedCustomerId}</p>}
           </CardHeader>
-          <CardContent className="p-6 space-y-8"> {/* Increased spacing */}
+          <CardContent className="p-6 space-y-8">
 
             <section> <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><User className="mr-2 h-5 w-5"/>Personal Information</h3> <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6"> <DetailItem icon={User} label="Full Name" value={customer.customerName} /> <DetailItem icon={Users} label="Father/Spouse Name" value={customer.fatherSpouseName} /> <DetailItem icon={PhoneIcon} label="Primary Phone" value={customer.customerPhone} isTel /> <DetailItem icon={PhoneIcon} label="Alternate Phone" value={customer.altMobileNo} isTel /> <DetailItem icon={Mail} label="Email ID" value={customer.emailId} /> <DetailItem icon={Hash} label="Aadhaar No." value={customer.aadhaarNo} /> </div> </section>
             <section> <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><Home className="mr-2 h-5 w-5"/>Address & Location</h3> <div className="grid grid-cols-1"> <DetailItem icon={Home} label="Full Address" value={fullAddress || 'N/A'} /> </div> <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6"> <DetailItem icon={MapPin} label="Map Link" value={customer.confirmedMapLink} isLink={!!customer.confirmedMapLink} /> <DetailItem icon={Building} label="Zone" value={customer.selectedZone} /> <DetailItem icon={BarChart3} label="Division" value={customer.selectedDivision} /> </div> </section>
@@ -350,12 +498,105 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
                 </div>
               )}
             </section>
+            
+            <section>
+              <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><Zap className="mr-2 h-5 w-5"/>Recharge Plan Now</h3>
+               <div className="space-y-4 p-4 border rounded-md bg-muted/10">
+                  <div className="space-y-2">
+                      <Label htmlFor="planSelect" className="flex items-center text-md"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Select New Plan</Label>
+                      {isLoadingPlans ? (<div className="flex items-center text-muted-foreground p-2 border rounded-md bg-background"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...</div>)
+                      : planFetchError ? (<Alert variant="destructive" className="mt-2"><AlertCircle className="h-4 w-4" /><AlertTitle>Plan Error</AlertTitle><AlertDescription>{planFetchError}</AlertDescription></Alert>)
+                      : plansList.length === 0 ? (<p className="text-sm text-muted-foreground p-2 border rounded-md bg-background">No plans available.</p>)
+                      : (
+                          <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                              <SelectTrigger id="planSelect" className="w-full md:w-[400px] bg-background"><SelectValue placeholder="Choose a plan" /></SelectTrigger>
+                              <SelectContent>
+                                  {plansList.map(plan => (
+                                      <SelectItem key={plan.planId} value={plan.planId}>
+                                          {plan.planName} - ₹{plan.price} ({plan.durationDays} days
+                                          {plan.espCycleMaxHours ? `, ${plan.espCycleMaxHours}hrs` : ''}
+                                          {plan.dailyWaterLimitLiters ? `, ${plan.dailyWaterLimitLiters}L/day` : ''})
+                                      </SelectItem>
+                                  ))}
+                              </SelectContent>
+                          </Select>
+                      )}
+                  </div>
+
+                  {selectedPlanForDisplay && (
+                    <div className="p-3 bg-primary/10 rounded-md text-sm border border-primary/30">
+                      <p className="font-semibold text-primary-foreground">New Plan Details:</p>
+                      <p><strong>Name:</strong> {selectedPlanForDisplay.planName}</p>
+                      <p><strong>Price:</strong> ₹{selectedPlanForDisplay.price}</p>
+                      <p><strong>Duration:</strong> {selectedPlanForDisplay.durationDays} days</p>
+                      {selectedPlanForDisplay.espCycleMaxHours !== undefined && <p><strong>Max Usage Hours:</strong> {selectedPlanForDisplay.espCycleMaxHours} hours</p>}
+                      {selectedPlanForDisplay.dailyWaterLimitLiters !== undefined && <p><strong>Max Daily Liters:</strong> {selectedPlanForDisplay.dailyWaterLimitLiters} L/day</p>}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                       <Label htmlFor="paymentMethodSelect" className="flex items-center text-md"><Banknote className="mr-2 h-5 w-5 text-primary"/>Payment Method</Label>
+                       <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                          <SelectTrigger id="paymentMethodSelect" className="w-full md:w-[300px] bg-background"><SelectValue placeholder="Select payment" /></SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="Online">Online</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Card">Card</SelectItem><SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                       </Select>
+                  </div>
+                  <Button onClick={handleRechargeAttempt} disabled={!selectedPlanId || !paymentMethod || isRecharging || isLoadingPlans || !!planFetchError || plansList.length === 0} className="w-full sm:w-auto">
+                      {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
+                      {isRecharging ? 'Processing...' : 'Proceed to Recharge'}
+                  </Button>
+              </div>
+            </section>
+
 
             <section> <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><FileText className="mr-2 h-5 w-5"/>Administrative</h3> <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6"> <DetailItem icon={Receipt} label="Original Receipt Number" value={customer.receiptNumber} /> <DetailItem icon={LinkIcon} label="Drive Receipt Link" value={customer.driveUrl} isLink={!!customer.driveUrl} /> <DetailItem icon={CalendarDays} label="Registered At" value={customer.registeredAt} isDate /> <DetailItem icon={ShieldCheck} label="Terms Agreed" value={customer.termsAgreed} isBoolean /> </div> </section>
 
           </CardContent>
           <CardFooter className="p-6 border-t"> <Button onClick={() => router.push('/all-customers')} variant="outline"> <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Customers </Button> </CardFooter>
         </Card>
+
+         <AlertDialog open={showRechargeConfirmationDialog} onOpenChange={setShowRechargeConfirmationDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center">
+                  <AlertTriangle className="h-6 w-6 mr-2 text-orange-500" />
+                  Active Plan Detected
+                </AlertDialogTitle>
+                <div className="text-sm text-muted-foreground space-y-3 pt-2">
+                  <div>Customer <span className="font-semibold">{customer?.customerName}</span> has an active plan:</div>
+                  <div className="p-3 bg-orange-50 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-md text-sm">
+                      <div><strong>Current Plan:</strong> {rechargeConfirmationDetails?.currentPlanName}</div>
+                      <div><strong>Ends On:</strong> {rechargeConfirmationDetails?.currentPlanEndDate}</div>
+                  </div>
+                  <div>New plan selected for recharge:</div>
+                   <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-md text-sm space-y-0.5">
+                      <div><strong>New Plan:</strong> {rechargeConfirmationDetails?.newPlanName}</div>
+                      <div><strong>Price:</strong> ₹{rechargeConfirmationDetails?.newPlanPrice}</div>
+                      <div><strong>Duration:</strong> {rechargeConfirmationDetails?.newPlanDurationDays} days</div>
+                      {rechargeConfirmationDetails?.newPlanMaxHours !== undefined && <div><strong>Max Hours:</strong> {rechargeConfirmationDetails.newPlanMaxHours} hrs</div>}
+                      {rechargeConfirmationDetails?.newPlanMaxLiters !== undefined && <div><strong>Max Liters/Day:</strong> {rechargeConfirmationDetails.newPlanMaxLiters} L</div>}
+                  </div>
+                  <div className="font-semibold">How would you like to apply the new plan?</div>
+                </div>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="sm:justify-between gap-2">
+                <AlertDialogCancel onClick={() => setShowRechargeConfirmationDialog(false)} disabled={isRecharging}>Cancel</AlertDialogCancel>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button onClick={() => proceedWithRecharge('add')} disabled={isRecharging} variant="outline" className="flex items-center">
+                      {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusSquare className="mr-2 h-4 w-4" />}
+                      Add to Current Plan
+                  </Button>
+                  <Button onClick={() => proceedWithRecharge('replace')} disabled={isRecharging} className="bg-primary hover:bg-primary/90 flex items-center">
+                      {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Replace className="mr-2 h-4 w-4" />}
+                      Replace Current Plan
+                  </Button>
+                </div>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
       </main>
       <footer className="text-center p-4 border-t text-sm text-muted-foreground mt-auto"> © {new Date().getFullYear()} DropPurity. All rights reserved. </footer>
     </div>
