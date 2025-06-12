@@ -1,3 +1,4 @@
+
 // src/app/customer-details/[customerId]/page.tsx
 
 "use client";
@@ -12,28 +13,25 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from '@/components/ui/button';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from '@/components/ui/input'; // Added for search if ever needed here
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertCircle, User, MapPin, Phone as PhoneIcon, Mail, Home, Briefcase, Droplet,
-  FileText, CalendarDays, Clock, Tag, ShieldCheck, BarChart3, Users,
+  FileText, CalendarDays, Clock, Tag, ShieldCheck, BarChart3, Users, AlertTriangle,
   Building, Hash, CircleDollarSign, Wrench, Receipt, LogOut, ArrowLeft, LinkIcon, ExternalLink, Droplets as AppIcon,
   RotateCcwIcon, History, Wifi, Activity, Hourglass, ListRestart, Zap, Loader2, ListChecks, Banknote,
-  PlusSquare, Replace, Search as SearchIcon // Added Zap, Loader2, ListChecks, Banknote, PlusSquare, Replace
+  PlusSquare, Replace, Search as SearchIcon
 } from 'lucide-react';
 
 interface LastUsageEntry {
@@ -83,11 +81,10 @@ interface Customer {
   registeredAt?: string;
   driveUrl?: string | null;
 
-  // Fields for Device Sync Status
-  lastContact?: string | null; // ISO String
+  lastContact?: string | null; 
   currentTotalHours?: number;
   lastUsage?: LastUsageEntry[] | null;
-  updatedAt?: string; // ISO String, general record update time
+  updatedAt?: string; 
 }
 
 interface RechargeHistoryItem {
@@ -99,10 +96,10 @@ interface RechargeHistoryItem {
   planPrice: number;
   planDurationDays: number;
   paymentMethod: string;
-  rechargeDate: string; // ISO String
+  rechargeDate: string; 
   rechargeType?: 'replace' | 'add';
-  newPlanStartDate: string; // ISO String
-  newPlanEndDate: string; // ISO String
+  newPlanStartDate: string; 
+  newPlanEndDate: string; 
   transactionId?: string;
 }
 
@@ -176,7 +173,7 @@ const DetailItem: React.FC<DetailItemProps> = ({
             displayValue = format(parsedDate, isDateTime ? "PPP p" : "PPP");
         }
       } catch (e) {
-         displayValue = value; // Fallback to original string if parsing fails
+         displayValue = value; 
       }
     } else if (isCurrency) {
       const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -197,11 +194,18 @@ const DetailItem: React.FC<DetailItemProps> = ({
   );
 };
 
+// Define the props type for the page component
+interface CustomerDetailsPageProps {
+  params: Promise<{ customerId: string }>;
+}
 
-export default function CustomerDetailsPage({ params }: { params: { customerId: string } }) {
+export default function CustomerDetailsPage({ params: paramsPromise }: CustomerDetailsPageProps) {
+  // Unwrap the params Promise using React.use()
+  const resolvedParams = use(paramsPromise);
+  const customerId = resolvedParams.customerId;
+  
   const router = useRouter();
   const { toast } = useToast();
-  const customerId = params.customerId;
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -211,7 +215,6 @@ export default function CustomerDetailsPage({ params }: { params: { customerId: 
   const [isLoadingRechargeHistory, setIsLoadingRechargeHistory] = useState(true);
   const [rechargeHistoryError, setRechargeHistoryError] = useState<string | null>(null);
 
-  // State for embedded recharge functionality
   const [plansList, setPlansList] = useState<PlanFromAPI[]>([]);
   const [isLoadingPlans, setIsLoadingPlans] = useState<boolean>(true);
   const [planFetchError, setPlanFetchError] = useState<string | null>(null);
@@ -297,10 +300,13 @@ export default function CustomerDetailsPage({ params }: { params: { customerId: 
   }, []);
 
   useEffect(() => {
-    fetchCustomerDetails();
-    fetchRechargeHistory();
-    fetchPlans();
-  }, [fetchCustomerDetails, fetchRechargeHistory, fetchPlans]);
+    // customerId will be available here because use() suspends until the promise resolves
+    if (customerId) {
+        fetchCustomerDetails();
+        fetchRechargeHistory();
+        fetchPlans();
+    }
+  }, [customerId, fetchCustomerDetails, fetchRechargeHistory, fetchPlans]);
 
   const handleLogout = () => {
     if (typeof window !== "undefined") {
@@ -332,7 +338,6 @@ export default function CustomerDetailsPage({ params }: { params: { customerId: 
         toast({ title: "Recharge Successful", description: result.message, variant: "success" });
         setSelectedPlanId(''); 
         setPaymentMethod('');
-        // Re-fetch customer details and recharge history to update the page
         fetchCustomerDetails();
         fetchRechargeHistory();
       } else {
@@ -381,7 +386,7 @@ export default function CustomerDetailsPage({ params }: { params: { customerId: 
   const selectedPlanForDisplay = plansList.find(p => p.planId === selectedPlanId);
 
 
-  if (isLoading) {
+  if (isLoading) { // This isLoading is for the initial customer data fetch
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-background to-muted/10">
         <Card className="w-full max-w-3xl shadow-xl rounded-xl">
@@ -399,8 +404,8 @@ export default function CustomerDetailsPage({ params }: { params: { customerId: 
   if (error) {
     return ( <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-background to-muted/10"> <Card className="w-full max-w-md shadow-xl rounded-xl"> <CardHeader><CardTitle className="text-2xl text-destructive text-center">Error</CardTitle></CardHeader> <CardContent className="p-6 text-center"> <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" /> <p className="text-destructive">{error}</p> <Button onClick={() => router.push('/all-customers')} className="mt-6"> Back to All Customers </Button> </CardContent> </Card> </div>);
   }
-  if (!customer) {
-    return ( <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-background to-muted/10"> <Card className="w-full max-w-md shadow-xl rounded-xl"> <CardHeader><CardTitle className="text-2xl text-center">Customer Not Found</CardTitle></CardHeader> <CardContent className="p-6 text-center"> <p className="text-muted-foreground">The requested customer could not be found.</p> <Button onClick={() => router.push('/all-customers')} className="mt-6"> Back to All Customers </Button> </CardContent> </Card> </div> );
+  if (!customer) { // This check is after isLoading is false and no error, meaning fetch completed but no customer
+    return ( <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-background to-muted/10"> <Card className="w-full max-w-md shadow-xl rounded-xl"> <CardHeader><CardTitle className="text-2xl text-center">Customer Not Found</CardTitle></CardHeader> <CardContent className="p-6 text-center"> <p className="text-muted-foreground">The requested customer could not be found for ID: {customerId}</p> <Button onClick={() => router.push('/all-customers')} className="mt-6"> Back to All Customers </Button> </CardContent> </Card> </div> );
   }
 
   const fullAddress = [ customer.customerAddress, customer.landmark, customer.city, customer.stateName, customer.pincode, customer.country ].filter(Boolean).join(', ');
@@ -602,3 +607,5 @@ export default function CustomerDetailsPage({ params }: { params: { customerId: 
     </div>
   );
 }
+
+    
