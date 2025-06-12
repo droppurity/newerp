@@ -7,11 +7,12 @@ import React, { useEffect, useState, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, parseISO, isValid as isValidDate, formatDistanceToNow } from 'date-fns';
+import { cn } from "@/lib/utils"; // <<< --- ADDED THIS IMPORT
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { 
+import {
   AlertCircle, User, MapPin, Phone as PhoneIcon, Mail, Home, Briefcase, Droplet,
   FileText, CalendarDays, Clock, Tag, ShieldCheck, BarChart3, Users,
   Building, Hash, CircleDollarSign, Wrench, Receipt, LogOut, ArrowLeft, LinkIcon, ExternalLink, Droplets as AppIcon,
@@ -44,31 +45,31 @@ interface Customer {
   generatedCustomerId?: string;
   modelInstalled?: string;
   serialNumber?: string;
-  installationDate?: string; 
+  installationDate?: string;
   installationTime?: string;
   tdsBefore?: string;
   tdsAfter?: string;
-  paymentType?: string; 
-  securityAmount?: string; 
-  
+  paymentType?: string;
+  securityAmount?: string;
+
   currentPlanId?: string;
-  currentPlanName?: string; 
-  planPricePaid?: number;   
-  planStartDate?: string;   
-  planEndDate?: string;     
+  currentPlanName?: string;
+  planPricePaid?: number;
+  planStartDate?: string;
+  planEndDate?: string;
   espCycleMaxHours?: number;
   espCycleMaxDays?: number;
-  lastRechargeDate?: string; 
-  rechargeCount?: number;   
+  lastRechargeDate?: string;
+  rechargeCount?: number;
 
   termsAgreed?: boolean;
-  registeredAt?: string; 
-  driveUrl?: string | null; 
+  registeredAt?: string;
+  driveUrl?: string | null;
 
   // Fields for Device Sync Status
   lastContact?: string | null; // ISO String
   currentTotalHours?: number;
-  lastUsage?: LastUsageEntry[] | null; 
+  lastUsage?: LastUsageEntry[] | null;
   updatedAt?: string; // ISO String, general record update time
 }
 
@@ -104,9 +105,9 @@ interface DetailItemProps {
   className?: string;
 }
 
-const DetailItem: React.FC<DetailItemProps> = ({ 
-    icon: Icon, label, value, isLink, isDate, isBoolean, isCurrency, isTel, 
-    isDateTime, isRelativeTime, currencySymbol = '₹', children, className 
+const DetailItem: React.FC<DetailItemProps> = ({
+    icon: Icon, label, value, isLink, isDate, isBoolean, isCurrency, isTel,
+    isDateTime, isRelativeTime, currencySymbol = '₹', children, className
 }) => {
   let displayValue: React.ReactNode = <span className="text-muted-foreground/80">N/A</span>;
 
@@ -254,7 +255,7 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
   if (!customer) {
     return ( <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-background to-muted/10"> <Card className="w-full max-w-md shadow-xl rounded-xl"> <CardHeader><CardTitle className="text-2xl text-center">Customer Not Found</CardTitle></CardHeader> <CardContent className="p-6 text-center"> <p className="text-muted-foreground">The requested customer could not be found.</p> <Button onClick={() => router.push('/all-customers')} className="mt-6"> Back to All Customers </Button> </CardContent> </Card> </div> );
   }
-  
+
   const fullAddress = [ customer.customerAddress, customer.landmark, customer.city, customer.stateName, customer.pincode, customer.country ].filter(Boolean).join(', ');
   const latestUsage = customer.lastUsage && customer.lastUsage.length > 0 ? customer.lastUsage[customer.lastUsage.length - 1] : null;
 
@@ -274,11 +275,11 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
              {customer.generatedCustomerId && <p className="text-sm text-muted-foreground pt-1">Customer ID: {customer.generatedCustomerId}</p>}
           </CardHeader>
           <CardContent className="p-6 space-y-8"> {/* Increased spacing */}
-            
+
             <section> <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><User className="mr-2 h-5 w-5"/>Personal Information</h3> <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6"> <DetailItem icon={User} label="Full Name" value={customer.customerName} /> <DetailItem icon={Users} label="Father/Spouse Name" value={customer.fatherSpouseName} /> <DetailItem icon={PhoneIcon} label="Primary Phone" value={customer.customerPhone} isTel /> <DetailItem icon={PhoneIcon} label="Alternate Phone" value={customer.altMobileNo} isTel /> <DetailItem icon={Mail} label="Email ID" value={customer.emailId} /> <DetailItem icon={Hash} label="Aadhaar No." value={customer.aadhaarNo} /> </div> </section>
             <section> <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><Home className="mr-2 h-5 w-5"/>Address & Location</h3> <div className="grid grid-cols-1"> <DetailItem icon={Home} label="Full Address" value={fullAddress || 'N/A'} /> </div> <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6"> <DetailItem icon={MapPin} label="Map Link" value={customer.confirmedMapLink} isLink={!!customer.confirmedMapLink} /> <DetailItem icon={Building} label="Zone" value={customer.selectedZone} /> <DetailItem icon={BarChart3} label="Division" value={customer.selectedDivision} /> </div> </section>
             <section> <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><Wrench className="mr-2 h-5 w-5"/>Installation & Device</h3> <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6"> <DetailItem icon={Tag} label="Model Installed" value={customer.modelInstalled} /> <DetailItem icon={Tag} label="Serial Number" value={customer.serialNumber} /> <DetailItem icon={CalendarDays} label="Installation Date" value={customer.installationDate} isDate /> <DetailItem icon={Clock} label="Installation Time" value={customer.installationTime} /> <DetailItem icon={Droplet} label="TDS Before" value={customer.tdsBefore ? `${customer.tdsBefore} ppm` : undefined} /> <DetailItem icon={Droplet} label="TDS After" value={customer.tdsAfter ? `${customer.tdsAfter} ppm` : undefined} /> </div> </section>
-            
+
             <section>
               <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><Briefcase className="mr-2 h-5 w-5"/>Active Plan & Payment</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
@@ -312,7 +313,7 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
                  <DetailItem icon={CalendarDays} label="Record Last Updated (DB)" value={customer.updatedAt} isDateTime />
               </div>
             </section>
-            
+
             <section>
               <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><History className="mr-2 h-5 w-5"/>Recharge History</h3>
               {isLoadingRechargeHistory ? (
