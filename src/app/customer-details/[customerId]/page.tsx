@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react'; // Removed 'use' import
+import React, { useEffect, useState, useCallback, use } from 'react'; // Added 'use' import
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, parseISO, isValid as isValidDate, formatDistanceToNow } from 'date-fns';
@@ -159,9 +159,10 @@ const DetailItem: React.FC<DetailItemProps> = ({
 };
 
 
-export default function CustomerDetailsPage({ params }: { params: { customerId: string } }) {
+export default function CustomerDetailsPage({ params: paramsPromise }: { params: Promise<{ customerId: string }> }) {
   const router = useRouter();
-  const customerId = params.customerId; // Directly access customerId
+  const resolvedParams = use(paramsPromise);
+  const customerId = resolvedParams.customerId;
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
