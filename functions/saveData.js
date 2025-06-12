@@ -3,7 +3,6 @@
 const { MongoClient } = require('mongodb');
 
 const uri = process.env.MONGODB_URI;
-// const secretKey = process.env.SECRET_KEY; // Original line using environment variable
 const secretKey = "1234"; // TEMPORARY hardcoded key for testing
 const dbName = process.env.DB_NAME || 'droppurityDB';
 
@@ -35,11 +34,10 @@ exports.handler = async (event, context) => {
   }
 
   const authHeader = event.headers.authorization;
-  if (!secretKey) { // This check is less relevant now with hardcoding but kept for structure
+  if (!secretKey) { 
     console.error('SAVE_DATA.JS: SERVER ERROR - SECRET_KEY is not set (hardcoded for test).');
     return { statusCode: 500, body: JSON.stringify({ message: 'Server configuration error: API key not set.' }), headers: { 'Content-Type': 'application/json' } };
   }
-  // Using your temporary secret key "1234"
   if (!authHeader || authHeader !== `Bearer ${secretKey}`) {
     console.warn('SAVE_DATA.JS: Unauthorized access attempt. Invalid or missing API key. Auth Header Received:', authHeader ? authHeader.substring(0,15) + '...' : 'NONE');
     return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }), headers: { 'Content-Type': 'application/json' } };
@@ -55,14 +53,16 @@ exports.handler = async (event, context) => {
     return { statusCode: 400, body: JSON.stringify({ message: 'Bad Request: Invalid JSON body.' }), headers: { 'Content-Type': 'application/json' } };
   }
 
-  // ESP sends customerId (generatedId), dailyHours, totalHours
-  const { customerId, dailyHours, totalHours } = data;
+  const { customerId, dailyHours, totalHours } = data; // ESP sends customerId (generatedId), dailyHours, totalHours
 
   if (!customerId || typeof dailyHours !== 'number' || typeof totalHours !== 'number') {
     console.warn('SAVE_DATA.JS: Bad Request - Missing or invalid customerId, dailyHours, or totalHours.', data);
     return { statusCode: 400, body: JSON.stringify({ message: 'Bad Request: Missing or invalid customerId, dailyHours, or totalHours.' }), headers: { 'Content-Type': 'application/json' } };
   }
   console.log('SAVE_DATA.JS: Processing for customerId:', customerId, 'dailyHours:', dailyHours, 'totalHours:', totalHours);
+
+  const dailyLitersUsed = parseFloat((dailyHours * 15).toFixed(2));
+  const totalLitersUsedInCycle = parseFloat((totalHours * 15).toFixed(2));
 
   try {
     const db = await connectToDatabase();
@@ -71,21 +71,24 @@ exports.handler = async (event, context) => {
     const newUsageEntry = {
       timestamp: new Date(),
       dailyHoursReported: dailyHours,
-      totalHoursReported: totalHours, // This is total for the ESP's current cycle
+      totalHoursReported: totalHours, 
+      dailyLitersUsed: dailyLitersUsed,
+      totalLitersUsedInCycle: totalLitersUsedInCycle,
     };
 
     const result = await customersCollection.updateOne(
-      { generatedCustomerId: customerId }, // Find customer by generatedCustomerId
+      { generatedCustomerId: customerId }, 
       {
         $set: {
-          currentTotalHours: totalHours, // Update ESP's current cycle total hours
+          currentTotalHours: totalHours, 
+          currentTotalLitersUsed: totalLitersUsedInCycle, // Update total liters used in cycle
           lastContact: new Date(),
           updatedAt: new Date()
         },
         $push: {
           lastUsage: {
             $each: [newUsageEntry],
-            $slice: -50 // Keep only the last 50 usage entries to manage document size
+            $slice: -50 
           }
         }
       }

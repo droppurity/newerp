@@ -1,3 +1,4 @@
+
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IPlan extends Document {
@@ -6,6 +7,7 @@ export interface IPlan extends Document {
   durationDays: number;
   price: number;
   dailyWaterLimitLiters?: number;
+  espCycleMaxHours?: number; // Total hours for the plan's duration
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -17,6 +19,7 @@ const PlanSchema: Schema = new Schema({
   durationDays: { type: Number, required: true },
   price: { type: Number, required: true },
   dailyWaterLimitLiters: { type: Number },
+  espCycleMaxHours: { type: Number }, // Total hours for the plan's duration
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

@@ -1,6 +1,5 @@
 
 // src/app/customer-details/[customerId]/page.tsx
-
 "use client";
 
 import React, { useEffect, useState, useCallback, use } from 'react';
@@ -35,9 +34,11 @@ import {
 } from 'lucide-react';
 
 interface LastUsageEntry {
-  timestamp: string; // ISO String
+  timestamp: string; 
   dailyHoursReported: number;
   totalHoursReported: number;
+  dailyLitersUsed?: number;      // Added
+  totalLitersUsedInCycle?: number; // Added
 }
 interface Customer {
   _id: string;
@@ -72,6 +73,7 @@ interface Customer {
   planPricePaid?: number;
   planStartDate?: string;
   planEndDate?: string;
+  dailyWaterLimitLiters?: number; // Added
   espCycleMaxHours?: number;
   espCycleMaxDays?: number;
   lastRechargeDate?: string;
@@ -83,6 +85,7 @@ interface Customer {
 
   lastContact?: string | null; 
   currentTotalHours?: number;
+  currentTotalLitersUsed?: number; // Added
   lastUsage?: LastUsageEntry[] | null;
   updatedAt?: string; 
 }
@@ -95,6 +98,8 @@ interface RechargeHistoryItem {
   planName: string;
   planPrice: number;
   planDurationDays: number;
+  dailyWaterLimitLiters?: number; // Added
+  espCycleMaxHours?: number;      // Added
   paymentMethod: string;
   rechargeDate: string; 
   rechargeType?: 'replace' | 'add';
@@ -125,8 +130,8 @@ interface PlanFromAPI {
   planName: string;
   price: number;
   durationDays: number;
-  espCycleMaxHours?: number;
-  dailyWaterLimitLiters?: number;
+  espCycleMaxHours?: number;     // Total hours for the plan
+  dailyWaterLimitLiters?: number; // Liters per day
 }
 
 interface RechargeConfirmationDetails {
@@ -135,8 +140,8 @@ interface RechargeConfirmationDetails {
   newPlanName?: string;
   newPlanPrice?: number;
   newPlanDurationDays?: number;
-  newPlanMaxHours?: number;
-  newPlanMaxLiters?: number;
+  newPlanMaxHours?: number;         // Total hours for new plan
+  newPlanMaxLitersPerDay?: number;  // Daily liter limit for new plan
 }
 
 
@@ -153,7 +158,7 @@ const DetailItem: React.FC<DetailItemProps> = ({
       displayValue = value ? "Yes" : "No";
     } else if (isLink && typeof value === 'string') {
       displayValue = (
-        <a href={value.startsWith('http') ? value : `https://${value}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 break-all">
+        <a href={value.startsWith('http') ? value : `https://www.google.com/maps?q=${encodeURIComponent(value)}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 break-all">
           View Link <ExternalLink className="h-3.5 w-3.5 shrink-0" />
         </a>
       );
@@ -194,15 +199,9 @@ const DetailItem: React.FC<DetailItemProps> = ({
   );
 };
 
-// Define the props type for the page component
-interface CustomerDetailsPageProps {
-  params: Promise<{ customerId: string }>;
-}
-
-export default function CustomerDetailsPage({ params: paramsPromise }: CustomerDetailsPageProps) {
-  // Unwrap the params Promise using React.use()
-  const resolvedParams = use(paramsPromise);
-  const customerId = resolvedParams.customerId;
+export default function CustomerDetailsPage({ params }: { params: Promise<{ customerId: string }> }) {
+  const resolvedParams = use(params);
+  const customerId = resolvedParams.customerId; 
   
   const router = useRouter();
   const { toast } = useToast();
@@ -300,7 +299,6 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
   }, []);
 
   useEffect(() => {
-    // customerId will be available here because use() suspends until the promise resolves
     if (customerId) {
         fetchCustomerDetails();
         fetchRechargeHistory();
@@ -373,7 +371,7 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
       newPlanPrice: newSelectedPlanDetails.price,
       newPlanDurationDays: newSelectedPlanDetails.durationDays,
       newPlanMaxHours: newSelectedPlanDetails.espCycleMaxHours,
-      newPlanMaxLiters: newSelectedPlanDetails.dailyWaterLimitLiters,
+      newPlanMaxLitersPerDay: newSelectedPlanDetails.dailyWaterLimitLiters,
     });
 
     if (isCurrentPlanActive) {
@@ -385,8 +383,7 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
 
   const selectedPlanForDisplay = plansList.find(p => p.planId === selectedPlanId);
 
-
-  if (isLoading) { // This isLoading is for the initial customer data fetch
+  if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-background to-muted/10">
         <Card className="w-full max-w-3xl shadow-xl rounded-xl">
@@ -404,7 +401,7 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
   if (error) {
     return ( <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-background to-muted/10"> <Card className="w-full max-w-md shadow-xl rounded-xl"> <CardHeader><CardTitle className="text-2xl text-destructive text-center">Error</CardTitle></CardHeader> <CardContent className="p-6 text-center"> <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" /> <p className="text-destructive">{error}</p> <Button onClick={() => router.push('/all-customers')} className="mt-6"> Back to All Customers </Button> </CardContent> </Card> </div>);
   }
-  if (!customer) { // This check is after isLoading is false and no error, meaning fetch completed but no customer
+  if (!customer) {
     return ( <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-background to-muted/10"> <Card className="w-full max-w-md shadow-xl rounded-xl"> <CardHeader><CardTitle className="text-2xl text-center">Customer Not Found</CardTitle></CardHeader> <CardContent className="p-6 text-center"> <p className="text-muted-foreground">The requested customer could not be found for ID: {customerId}</p> <Button onClick={() => router.push('/all-customers')} className="mt-6"> Back to All Customers </Button> </CardContent> </Card> </div> );
   }
 
@@ -439,8 +436,9 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
                 <DetailItem icon={CircleDollarSign} label="Current Plan Price Paid" value={customer.planPricePaid} isCurrency />
                 <DetailItem icon={CalendarDays} label="Plan Start Date" value={customer.planStartDate} isDate />
                 <DetailItem icon={CalendarDays} label="Plan End Date" value={customer.planEndDate} isDate />
-                <DetailItem icon={Hourglass} label="Plan ESP Max Hours" value={customer.espCycleMaxHours ? `${customer.espCycleMaxHours} hrs` : 'N/A'} />
-                <DetailItem icon={Droplet} label="Plan ESP Max Days" value={customer.espCycleMaxDays ? `${customer.espCycleMaxDays} days` : 'N/A'} />
+                <DetailItem icon={Droplet} label="Daily Water Limit" value={customer.dailyWaterLimitLiters ? `${customer.dailyWaterLimitLiters} L/day` : 'N/A'} />
+                <DetailItem icon={Hourglass} label="Plan ESP Max Hours (Total Cycle)" value={customer.espCycleMaxHours ? `${customer.espCycleMaxHours} hrs` : 'N/A'} />
+                <DetailItem icon={CalendarDays} label="Plan ESP Max Days (Total Cycle)" value={customer.espCycleMaxDays ? `${customer.espCycleMaxDays} days` : 'N/A'} />
                 <DetailItem icon={Receipt} label="Payment Type (Initial)" value={customer.paymentType} />
                 <DetailItem icon={CircleDollarSign} label="Security Amount" value={customer.securityAmount} isCurrency />
                 <DetailItem icon={RotateCcwIcon} label="Last Recharge Date" value={customer.lastRechargeDate} isDate />
@@ -452,11 +450,13 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
               <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><Activity className="mr-2 h-5 w-5"/>Device Sync Status</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                 <DetailItem icon={Wifi} label="Last Contact Time" value={customer.lastContact} isDateTime />
-                <DetailItem icon={Clock} label="Current Cycle Total Hours" value={customer.currentTotalHours ? `${customer.currentTotalHours.toFixed(2)} hrs` : 'N/A'} />
+                <DetailItem icon={Clock} label="Current Cycle Total Hours Used" value={customer.currentTotalHours ? `${customer.currentTotalHours.toFixed(2)} hrs` : 'N/A'} />
+                <DetailItem icon={Droplet} label="Current Cycle Total Liters Used" value={customer.currentTotalLitersUsed ? `${customer.currentTotalLitersUsed.toFixed(2)} L` : 'N/A'} />
+
                 {latestUsage ? (
                   <>
                     <DetailItem icon={Hourglass} label="Last Reported Daily Hours" value={latestUsage.dailyHoursReported ? `${latestUsage.dailyHoursReported.toFixed(2)} hrs` : 'N/A'} />
-                    <DetailItem icon={Hourglass} label="Last Reported Total Hours (Cycle)" value={latestUsage.totalHoursReported ? `${latestUsage.totalHoursReported.toFixed(2)} hrs` : 'N/A'} />
+                    <DetailItem icon={Droplet} label="Last Reported Daily Liters" value={latestUsage.dailyLitersUsed ? `${latestUsage.dailyLitersUsed.toFixed(2)} L` : 'N/A'} />
                     <DetailItem icon={CalendarDays} label="Timestamp of Last Report" value={latestUsage.timestamp} isDateTime className="md:col-span-2"/>
                   </>
                 ) : (
@@ -492,7 +492,7 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
                         <TableRow key={recharge._id}>
                           <TableCell>{format(parseISO(recharge.rechargeDate), "dd MMM yyyy")}</TableCell>
                           <TableCell>{recharge.planName}</TableCell>
-                          <TableCell>{recharge.rechargeType === 'add' ? 'Added' : 'Replaced'}</TableCell>
+                          <TableCell>{recharge.rechargeType === 'add' ? 'Added' : (recharge.rechargeType === 'replace' ? 'Replaced' : 'N/A')}</TableCell>
                           <TableCell>₹{recharge.planPrice.toFixed(2)}</TableCell>
                           <TableCell>{format(parseISO(recharge.newPlanStartDate), "dd MMM yyyy")}</TableCell>
                           <TableCell>{format(parseISO(recharge.newPlanEndDate), "dd MMM yyyy")}</TableCell>
@@ -532,9 +532,9 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
                     <div className="p-3 bg-primary/10 rounded-md text-sm border border-primary/30">
                       <p className="font-semibold text-primary-foreground">New Plan Details:</p>
                       <p><strong>Name:</strong> {selectedPlanForDisplay.planName}</p>
-                      <p><strong>Price:</strong> ₹{selectedPlanForDisplay.price}</p>
+                      <p><strong>Price:</strong> ₹{selectedPlanForDisplay.price.toFixed(2)}</p>
                       <p><strong>Duration:</strong> {selectedPlanForDisplay.durationDays} days</p>
-                      {selectedPlanForDisplay.espCycleMaxHours !== undefined && <p><strong>Max Usage Hours:</strong> {selectedPlanForDisplay.espCycleMaxHours} hours</p>}
+                      {selectedPlanForDisplay.espCycleMaxHours !== undefined && <p><strong>Total Max Hours:</strong> {selectedPlanForDisplay.espCycleMaxHours} hours</p>}
                       {selectedPlanForDisplay.dailyWaterLimitLiters !== undefined && <p><strong>Max Daily Liters:</strong> {selectedPlanForDisplay.dailyWaterLimitLiters} L/day</p>}
                     </div>
                   )}
@@ -554,7 +554,6 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
                   </Button>
               </div>
             </section>
-
 
             <section> <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><FileText className="mr-2 h-5 w-5"/>Administrative</h3> <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6"> <DetailItem icon={Receipt} label="Original Receipt Number" value={customer.receiptNumber} /> <DetailItem icon={LinkIcon} label="Drive Receipt Link" value={customer.driveUrl} isLink={!!customer.driveUrl} /> <DetailItem icon={CalendarDays} label="Registered At" value={customer.registeredAt} isDate /> <DetailItem icon={ShieldCheck} label="Terms Agreed" value={customer.termsAgreed} isBoolean /> </div> </section>
 
@@ -578,10 +577,10 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
                   <div>New plan selected for recharge:</div>
                    <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-md text-sm space-y-0.5">
                       <div><strong>New Plan:</strong> {rechargeConfirmationDetails?.newPlanName}</div>
-                      <div><strong>Price:</strong> ₹{rechargeConfirmationDetails?.newPlanPrice}</div>
+                      <div><strong>Price:</strong> ₹{rechargeConfirmationDetails?.newPlanPrice?.toFixed(2)}</div>
                       <div><strong>Duration:</strong> {rechargeConfirmationDetails?.newPlanDurationDays} days</div>
-                      {rechargeConfirmationDetails?.newPlanMaxHours !== undefined && <div><strong>Max Hours:</strong> {rechargeConfirmationDetails.newPlanMaxHours} hrs</div>}
-                      {rechargeConfirmationDetails?.newPlanMaxLiters !== undefined && <div><strong>Max Liters/Day:</strong> {rechargeConfirmationDetails.newPlanMaxLiters} L</div>}
+                      {rechargeConfirmationDetails?.newPlanMaxHours !== undefined && <div><strong>Total Max Hours:</strong> {rechargeConfirmationDetails.newPlanMaxHours} hrs</div>}
+                      {rechargeConfirmationDetails?.newPlanMaxLitersPerDay !== undefined && <div><strong>Max Liters/Day:</strong> {rechargeConfirmationDetails.newPlanMaxLitersPerDay} L</div>}
                   </div>
                   <div className="font-semibold">How would you like to apply the new plan?</div>
                 </div>
@@ -607,5 +606,3 @@ export default function CustomerDetailsPage({ params: paramsPromise }: CustomerD
     </div>
   );
 }
-
-    

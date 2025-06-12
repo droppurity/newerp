@@ -66,8 +66,7 @@ export async function GET(request: NextRequest) {
     const plansCollection = db.collection('plans');
     
     console.log("API Route (plans): Fetching active plans from 'plans' collection, sorted by price.");
-    // Fetch active plans and sort them, e.g., by price or a predefined order
-    const activePlans = await plansCollection.find({ isActive: true }).sort({ dailyWaterLimitLiters: 1, price: 1 }).toArray(); // Added sort
+    const activePlans = await plansCollection.find({ isActive: true }).sort({ dailyWaterLimitLiters: 1, price: 1 }).toArray();
     
     if (activePlans.length === 0) {
         console.warn("API Route (plans): No active plans found in the database.");
@@ -75,17 +74,25 @@ export async function GET(request: NextRequest) {
         console.log(`API Route (plans): Found ${activePlans.length} active plans.`);
     }
 
-    // Convert ObjectId to string for JSON serialization
-    const serializablePlans = activePlans.map(plan => ({
-      ...plan,
-      _id: plan._id.toString(),
-    }));
+    const serializablePlans = activePlans.map(plan => {
+      let espCycleMaxHours = plan.espCycleMaxHours;
+      // Calculate espCycleMaxHours if not present or zero, based on 1 hour = 15 liters
+      if ((!espCycleMaxHours || espCycleMaxHours === 0) && plan.durationDays && plan.dailyWaterLimitLiters) {
+        espCycleMaxHours = Math.round(((plan.durationDays * plan.dailyWaterLimitLiters) / 15) * 100) / 100;
+      }
+
+      return {
+        ...plan,
+        _id: plan._id.toString(),
+        espCycleMaxHours: espCycleMaxHours || 0, // Ensure it's a number, defaults to 0
+        dailyWaterLimitLiters: plan.dailyWaterLimitLiters || 0, // Ensure it's a number, defaults to 0
+      };
+    });
 
     return NextResponse.json({ success: true, plans: serializablePlans }, { status: 200 });
 
   } catch (error: any) {
     console.error('API Route Error in /api/plans GET handler:', error);
-    // Ensure a JSON response is sent on error
     return NextResponse.json(
       { success: false, message: 'Failed to fetch plans.', details: error.message || 'Unknown server error.' },
       { status: 500 }

@@ -45,25 +45,32 @@ async function connectToDatabaseForInit(): Promise<{ db: Db | null, client: Mong
   }
 }
 
+const calculateEspCycleMaxHours = (durationDays: number, dailyWaterLimitLiters: number): number => {
+  if (durationDays > 0 && dailyWaterLimitLiters > 0) {
+    return Math.round(((durationDays * dailyWaterLimitLiters) / 15) * 100) / 100; // Rounded to 2 decimal places
+  }
+  return 0;
+};
+
 const newSamplePlans = [
   // 25L/day plans
-  { planId: "25L_7D_TRIAL", planName: "25L/day - 7 Days Trial", price: 0, durationDays: 7, dailyWaterLimitLiters: 25, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "25L_1M", planName: "25L/day - 1 Month", price: 799, durationDays: 30, dailyWaterLimitLiters: 25, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "25L_3M", planName: "25L/day - 3 Months", price: 1077, durationDays: 90, dailyWaterLimitLiters: 25, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "25L_6M", planName: "25L/day - 6 Months", price: 1794, durationDays: 180, dailyWaterLimitLiters: 25, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "25L_13M", planName: "25L/day - 13 Months", price: 3600, durationDays: 390, dailyWaterLimitLiters: 25, isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "25L_7D_TRIAL", planName: "25L/day - 7 Days Trial", price: 0, durationDays: 7, dailyWaterLimitLiters: 25, espCycleMaxHours: calculateEspCycleMaxHours(7, 25), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "25L_1M", planName: "25L/day - 1 Month", price: 799, durationDays: 30, dailyWaterLimitLiters: 25, espCycleMaxHours: calculateEspCycleMaxHours(30, 25), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "25L_3M", planName: "25L/day - 3 Months", price: 1077, durationDays: 90, dailyWaterLimitLiters: 25, espCycleMaxHours: calculateEspCycleMaxHours(90, 25), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "25L_6M", planName: "25L/day - 6 Months", price: 1794, durationDays: 180, dailyWaterLimitLiters: 25, espCycleMaxHours: calculateEspCycleMaxHours(180, 25), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "25L_13M", planName: "25L/day - 13 Months", price: 3600, durationDays: 390, dailyWaterLimitLiters: 25, espCycleMaxHours: calculateEspCycleMaxHours(390, 25), isActive: true, createdAt: new Date(), updatedAt: new Date() },
   // 50L/day plans
-  { planId: "50L_7D_TRIAL", planName: "50L/day - 7 Days Trial", price: 0, durationDays: 7, dailyWaterLimitLiters: 50, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "50L_1M", planName: "50L/day - 1 Month", price: 899, durationDays: 30, dailyWaterLimitLiters: 50, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "50L_3M", planName: "50L/day - 3 Months", price: 1197, durationDays: 90, dailyWaterLimitLiters: 50, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "50L_6M", planName: "50L/day - 6 Months", price: 2394, durationDays: 180, dailyWaterLimitLiters: 50, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "50L_13M", planName: "50L/day - 13 Months", price: 4800, durationDays: 390, dailyWaterLimitLiters: 50, isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "50L_7D_TRIAL", planName: "50L/day - 7 Days Trial", price: 0, durationDays: 7, dailyWaterLimitLiters: 50, espCycleMaxHours: calculateEspCycleMaxHours(7, 50), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "50L_1M", planName: "50L/day - 1 Month", price: 899, durationDays: 30, dailyWaterLimitLiters: 50, espCycleMaxHours: calculateEspCycleMaxHours(30, 50), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "50L_3M", planName: "50L/day - 3 Months", price: 1197, durationDays: 90, dailyWaterLimitLiters: 50, espCycleMaxHours: calculateEspCycleMaxHours(90, 50), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "50L_6M", planName: "50L/day - 6 Months", price: 2394, durationDays: 180, dailyWaterLimitLiters: 50, espCycleMaxHours: calculateEspCycleMaxHours(180, 50), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "50L_13M", planName: "50L/day - 13 Months", price: 4800, durationDays: 390, dailyWaterLimitLiters: 50, espCycleMaxHours: calculateEspCycleMaxHours(390, 50), isActive: true, createdAt: new Date(), updatedAt: new Date() },
   // 100L/day plans
-  { planId: "100L_7D_TRIAL", planName: "100L/day - 7 Days Trial", price: 0, durationDays: 7, dailyWaterLimitLiters: 100, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "100L_1M", planName: "100L/day - 1 Month", price: 1000, durationDays: 30, dailyWaterLimitLiters: 100, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "100L_3M", planName: "100L/day - 3 Months", price: 2400, durationDays: 90, dailyWaterLimitLiters: 100, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "100L_6M", planName: "100L/day - 6 Months", price: 4000, durationDays: 180, dailyWaterLimitLiters: 100, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { planId: "100L_13M", planName: "100L/day - 13 Months", price: 9392, durationDays: 390, dailyWaterLimitLiters: 100, isActive: true, createdAt: new Date(), updatedAt: new Date() }
+  { planId: "100L_7D_TRIAL", planName: "100L/day - 7 Days Trial", price: 0, durationDays: 7, dailyWaterLimitLiters: 100, espCycleMaxHours: calculateEspCycleMaxHours(7, 100), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "100L_1M", planName: "100L/day - 1 Month", price: 1000, durationDays: 30, dailyWaterLimitLiters: 100, espCycleMaxHours: calculateEspCycleMaxHours(30, 100), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "100L_3M", planName: "100L/day - 3 Months", price: 2400, durationDays: 90, dailyWaterLimitLiters: 100, espCycleMaxHours: calculateEspCycleMaxHours(90, 100), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "100L_6M", planName: "100L/day - 6 Months", price: 4000, durationDays: 180, dailyWaterLimitLiters: 100, espCycleMaxHours: calculateEspCycleMaxHours(180, 100), isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  { planId: "100L_13M", planName: "100L/day - 13 Months", price: 9392, durationDays: 390, dailyWaterLimitLiters: 100, espCycleMaxHours: calculateEspCycleMaxHours(390, 100), isActive: true, createdAt: new Date(), updatedAt: new Date() }
 ];
 
 const initialZonesData = [
@@ -75,7 +82,7 @@ const initialZonesData = [
 const initialConfigurationsData = [
   {
     configKey: "termsAndConditions",
-    title: "Terms & Conditions", // Corrected: Removed &amp;
+    title: "Terms & Conditions",
     contentBlocks: [
       "1. Rental Agreement",
       "1.1 The rental services provided by Drop Purity are subject to these Terms and Conditions. By signing the rental agreement, the customer agrees to the terms outlined here.",
@@ -294,7 +301,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-    
-
-    
