@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { 
-  Droplets, LogOut, Search as SearchIcon, Zap, LayoutDashboard, Loader2, AlertCircle, ListChecks, Banknote, CheckCircle, AlertTriangle
+  Droplets, LogOut, Search as SearchIcon, Zap, LayoutDashboard, Loader2, AlertCircle, ListChecks, Banknote, CheckCircle, AlertTriangle, PlusSquare, Replace
 } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { parseISO, isFuture, format } from 'date-fns';
+import { parseISO, isFuture, format, addDays as dateFnsAddDays } from 'date-fns';
 
 const isAuthenticatedClientSide = () => {
   if (typeof window !== "undefined") {
@@ -147,7 +147,7 @@ export default function RechargePlanPage() {
       const data = await response.json();
       if (response.ok && data.success) {
         if (data.customers && data.customers.length > 0) {
-          setFoundCustomer(data.customers[0]); // Select the first customer found
+          setFoundCustomer(data.customers[0]); 
           toast({ title: "Customer Found", description: `${data.customers[0].customerName} selected.` });
         } else {
           setFoundCustomer(null);
@@ -165,15 +165,21 @@ export default function RechargePlanPage() {
     }
   };
   
-  const proceedWithRecharge = async () => {
+  const proceedWithRecharge = async (rechargeType: 'replace' | 'add') => {
     if (!foundCustomer || !selectedPlanId || !paymentMethod) {
         toast({ variant: "destructive", title: "Error", description: "Missing customer, plan, or payment method details." });
-        setIsRecharging(false); // Ensure isRecharging is reset
+        setIsRecharging(false); 
+        setShowRechargeConfirmationDialog(false);
         return;
     }
     setIsRecharging(true);
     try {
-      const rechargeData = { customerId: foundCustomer._id, planId: selectedPlanId, paymentMethod };
+      const rechargeData = { 
+        customerId: foundCustomer._id, 
+        planId: selectedPlanId, 
+        paymentMethod,
+        rechargeType 
+      };
       const response = await fetch('/api/recharge', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rechargeData),
       });
@@ -217,7 +223,8 @@ export default function RechargePlanPage() {
       });
       setShowRechargeConfirmationDialog(true);
     } else {
-      proceedWithRecharge();
+      // If no active plan, default to 'replace' logic (starts today)
+      proceedWithRecharge('replace'); 
     }
   };
 
@@ -320,7 +327,7 @@ export default function RechargePlanPage() {
                         </div>
                         <Button onClick={handleRechargeAttempt} disabled={!selectedPlanId || !paymentMethod || isRecharging || isLoadingPlans || !!planFetchError || plansList.length === 0} className="w-full sm:w-auto">
                             {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
-                            {isRecharging ? 'Processing...' : 'Confirm Recharge'}
+                            {isRecharging ? 'Processing...' : 'Proceed to Recharge'}
                         </Button>
                     </CardContent>
                 </Card>
@@ -334,32 +341,35 @@ export default function RechargePlanPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle className="flex items-center">
                     <AlertTriangle className="h-6 w-6 mr-2 text-orange-500" />
-                    Active Plan Warning
+                    Active Plan Detected
                   </AlertDialogTitle>
                   <AlertDialogDescription className="space-y-3 pt-2">
-                    <div>This customer already has an active plan:</div>
+                    <div>Customer <span className="font-semibold">{foundCustomer?.customerName}</span> has an active plan:</div>
                     <div className="p-3 bg-orange-50 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-md text-sm">
                         <div><strong>Current Plan:</strong> {rechargeConfirmationDetails?.currentPlanName}</div>
                         <div><strong>Ends On:</strong> {rechargeConfirmationDetails?.currentPlanEndDate}</div>
                     </div>
-                    <div>Recharging with the new plan:</div>
-                    <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-md text-sm">
+                    <div>New plan selected:</div>
+                     <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-md text-sm">
                         <div><strong>New Plan:</strong> {rechargeConfirmationDetails?.newPlanName}</div>
                         <div><strong>Price:</strong> ₹{rechargeConfirmationDetails?.newPlanPrice}</div>
                         <div><strong>Duration:</strong> {rechargeConfirmationDetails?.newPlanDurationDays} days</div>
                     </div>
-                    <div className="font-semibold">
-                      Proceeding will start the new plan immediately, effectively replacing the current active plan.
-                    </div>
-                    <div>Are you sure you want to continue?</div>
+                    <div className="font-semibold">How would you like to apply the new plan?</div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
+                <AlertDialogFooter className="sm:justify-between gap-2">
                   <AlertDialogCancel onClick={() => setShowRechargeConfirmationDialog(false)} disabled={isRecharging}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={proceedWithRecharge} disabled={isRecharging} className="bg-primary hover:bg-primary/90">
-                    {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {isRecharging ? 'Processing...' : 'Yes, Proceed with Recharge'}
-                  </AlertDialogAction>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button onClick={() => proceedWithRecharge('add')} disabled={isRecharging} variant="outline" className="flex items-center">
+                        {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusSquare className="mr-2 h-4 w-4" />}
+                        Add to Current Plan
+                    </Button>
+                    <Button onClick={() => proceedWithRecharge('replace')} disabled={isRecharging} className="bg-primary hover:bg-primary/90 flex items-center">
+                        {isRecharging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Replace className="mr-2 h-4 w-4" />}
+                        Replace Current Plan
+                    </Button>
+                  </div>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -373,4 +383,3 @@ export default function RechargePlanPage() {
     </div>
   );
 }
-

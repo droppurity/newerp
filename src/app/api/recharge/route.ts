@@ -1,7 +1,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { MongoClient, Db, ObjectId, MongoError } from 'mongodb';
-import { addDays } from 'date-fns';
+import { addDays, parseISO, isFuture } from 'date-fns'; // Added parseISO, isFuture
 
 // --- Environment Variables ---
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -73,10 +73,10 @@ export async function POST(request: NextRequest) {
   }
   
   const { 
-    customerId, // MongoDB ObjectId string for the customer
-    planId,     // String planId for the new plan
+    customerId, 
+    planId,     
     paymentMethod,
-    // customerGeneratedId is implicitly fetched from the customer document
+    rechargeType = 'replace', // Default to 'replace' if not provided
   } = requestBody;
 
   if (!customerId || !planId || !paymentMethod) {
@@ -98,28 +98,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Customer not found.' }, { status: 404 });
     }
 
-    const plan = await plansCollection.findOne({ planId: planId, isActive: true });
-    if (!plan) {
+    const newPlan = await plansCollection.findOne({ planId: planId, isActive: true });
+    if (!newPlan) {
       return NextResponse.json({ success: false, message: `Plan with ID ${planId} not found or is inactive.` }, { status: 404 });
     }
 
     const currentDate = new Date();
-    const newPlanStartDate = currentDate;
-    const newPlanEndDate = addDays(currentDate, plan.durationDays || 30);
+    let effectiveStartDateForNewPlanDuration = currentDate; // Base for calculating end date
+    let finalNewPlanEndDate;
+
+    if (rechargeType === 'add' && customer.planEndDate) {
+      const currentPlanEndDate = parseISO(customer.planEndDate);
+      if (isFuture(currentPlanEndDate)) {
+        effectiveStartDateForNewPlanDuration = currentPlanEndDate; // New plan duration starts after current one ends
+      }
+    }
+    // If 'replace' or if current plan already expired, effectiveStartDateForNewPlanDuration remains `currentDate`.
+
+    finalNewPlanEndDate = addDays(effectiveStartDateForNewPlanDuration, newPlan.durationDays || 30);
+
+    // The actual start date of this recharge event is today.
+    const rechargeEventDate = currentDate; 
 
     const customerUpdateResult = await customersCollection.updateOne(
       { _id: customerObjectId },
       { 
         $set: { 
-          currentPlanId: plan.planId,
-          currentPlanName: plan.planName,
-          planPricePaid: plan.price,
-          planStartDate: newPlanStartDate,
-          planEndDate: newPlanEndDate,
-          espCycleMaxHours: plan.espCycleMaxHours || 0,
-          espCycleMaxDays: plan.durationDays || 0,
+          currentPlanId: newPlan.planId,
+          currentPlanName: newPlan.planName,
+          planPricePaid: newPlan.price, // Price for this specific recharge
+          planStartDate: rechargeEventDate, // When this recharge takes effect for billing/record
+          planEndDate: finalNewPlanEndDate, // The new absolute end date of service
+          espCycleMaxHours: newPlan.espCycleMaxHours || 0, // Limits for the new plan segment
+          espCycleMaxDays: newPlan.durationDays || 0,      // Duration of the new plan segment
           currentTotalHours: 0, // Reset ESP's total running hours for the new cycle
-          lastRechargeDate: currentDate,
+          lastRechargeDate: rechargeEventDate,
           updatedAt: currentDate,
         },
         $inc: { rechargeCount: 1 } 
@@ -133,29 +146,30 @@ export async function POST(request: NextRequest) {
     const rechargeRecord = {
       customerId: customerObjectId,
       customerGeneratedId: customer.generatedCustomerId,
-      planId: plan.planId,
-      planName: plan.planName,
-      planPrice: plan.price,
-      planDurationDays: plan.durationDays,
+      planId: newPlan.planId,
+      planName: newPlan.planName,
+      planPrice: newPlan.price,
+      planDurationDays: newPlan.durationDays,
       paymentMethod: paymentMethod,
-      rechargeDate: currentDate,
-      newPlanStartDate: newPlanStartDate,
-      newPlanEndDate: newPlanEndDate,
-      // transactionId: "placeholder_txn_id_from_payment_gateway" 
+      rechargeDate: rechargeEventDate,
+      rechargeType: rechargeType, // Log how this recharge was applied
+      newPlanStartDate: rechargeEventDate, // Start of this particular recharge cycle
+      newPlanEndDate: finalNewPlanEndDate, // The resulting overall plan end date
     };
     await rechargesCollection.insertOne(rechargeRecord);
 
-    console.log(`API Route (recharge): Recharge processed for customer ${customer.customerName} (ID: ${customer.generatedCustomerId}), New Plan: ${plan.planName}`);
+    console.log(`API Route (recharge): Recharge (${rechargeType}) processed for customer ${customer.customerName} (ID: ${customer.generatedCustomerId}), New Plan: ${newPlan.planName}`);
     
     return NextResponse.json(
         { 
           success: true, 
-          message: `Plan "${plan.planName}" successfully recharged for ${customer.customerName}.`,
+          message: `Plan "${newPlan.planName}" successfully recharged for ${customer.customerName} (${rechargeType} mode). New end date: ${format(finalNewPlanEndDate, "PPP")}`,
           rechargeDetails: {
-            planEndDate: newPlanEndDate.toISOString(),
-            newPlanStartDate: newPlanStartDate.toISOString(),
+            planEndDate: finalNewPlanEndDate.toISOString(),
+            newPlanStartDate: rechargeEventDate.toISOString(),
             customerName: customer.customerName,
-            planName: plan.planName,
+            planName: newPlan.planName,
+            rechargeType: rechargeType,
           }
         }, 
         { status: 200 }
