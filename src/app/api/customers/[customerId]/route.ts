@@ -44,6 +44,18 @@ async function connectToDatabase(): Promise<Db> {
   }
 }
 
+const ensureIsoString = (dateValue: any): string | null => {
+  if (!dateValue) return null;
+  if (dateValue instanceof Date) return dateValue.toISOString();
+  try {
+    const parsedDate = new Date(dateValue);
+    if (isNaN(parsedDate.getTime())) return dateValue.toString(); // Fallback to original string if invalid
+    return parsedDate.toISOString();
+  } catch (e) {
+    return dateValue.toString(); // Fallback if Date constructor throws
+  }
+};
+
 export async function GET(request: NextRequest, { params }: { params: { customerId: string } }) {
   const { customerId } = params;
 
@@ -65,8 +77,11 @@ export async function GET(request: NextRequest, { params }: { params: { customer
     const serializableCustomer = {
       ...customer,
       _id: customer._id.toString(),
-      registeredAt: customer.registeredAt ? (customer.registeredAt instanceof Date ? customer.registeredAt.toISOString() : new Date(customer.registeredAt).toISOString()) : null,
-      installationDate: customer.installationDate ? (customer.installationDate instanceof Date ? customer.installationDate.toISOString() : new Date(customer.installationDate).toISOString()) : null,
+      registeredAt: ensureIsoString(customer.registeredAt),
+      installationDate: ensureIsoString(customer.installationDate),
+      planStartDate: ensureIsoString(customer.planStartDate),
+      planEndDate: ensureIsoString(customer.planEndDate),
+      lastRechargeDate: ensureIsoString(customer.lastRechargeDate),
       // Ensure any other date fields stored as Date objects are also converted to ISOString
     };
     
@@ -83,3 +98,4 @@ export async function GET(request: NextRequest, { params }: { params: { customer
     return NextResponse.json({ success: false, message: errorMessage, details: error.message }, { status: statusCode });
   }
 }
+

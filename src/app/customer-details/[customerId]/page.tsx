@@ -13,7 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   AlertCircle, User, MapPin, Phone as PhoneIcon, Mail, Home, Briefcase, Droplet,
   FileText, CalendarDays, Clock, Tag, ShieldCheck, BarChart3, Users,
-  Building, Hash, CircleDollarSign, Wrench, Receipt, LogOut, ArrowLeft, LinkIcon, ExternalLink, Droplets as AppIcon
+  Building, Hash, CircleDollarSign, Wrench, Receipt, LogOut, ArrowLeft, LinkIcon, ExternalLink, Droplets as AppIcon,
+  RotateCcwIcon // Added for Last Recharge Date
 } from 'lucide-react';
 
 interface Customer {
@@ -37,17 +38,25 @@ interface Customer {
   generatedCustomerId?: string;
   modelInstalled?: string;
   serialNumber?: string;
-  installationDate?: string; // Expected as ISO string from API
+  installationDate?: string; 
   installationTime?: string;
   tdsBefore?: string;
   tdsAfter?: string;
-  paymentType?: string;
+  paymentType?: string; // Initial payment type
   securityAmount?: string; 
-  planSelected?: string; // Plan ID
-  planName?: string;     // Actual name of the plan
-  planPrice?: number; 
+  // Plan related fields (current plan)
+  currentPlanId?: string;
+  currentPlanName?: string; 
+  planPricePaid?: number;   
+  planStartDate?: string;   
+  planEndDate?: string;     
+  espCycleMaxHours?: number;
+  espCycleMaxDays?: number;
+  lastRechargeDate?: string; 
+  rechargeCount?: number;   
+
   termsAgreed?: boolean;
-  registeredAt?: string; // Expected as ISO string from API
+  registeredAt?: string; 
   driveUrl?: string | null; 
 }
 
@@ -87,12 +96,19 @@ const DetailItem: React.FC<DetailItemProps> = ({ icon: Icon, label, value, isLin
       );
     } else if (isDate && typeof value === 'string') {
       try {
-        displayValue = format(parseISO(value), "PPP"); // Use parseISO for ISO strings
+        const parsedDate = parseISO(value);
+        displayValue = format(parsedDate, "PPP");
       } catch (e) {
-        try { // Fallback for non-ISO date strings like YYYY-MM-DD
-            displayValue = format(new Date(value), "PPP");
+         // Fallback for potentially non-ISO date strings or invalid dates
+        try {
+            const simpleParsedDate = new Date(value);
+             if (isNaN(simpleParsedDate.getTime())) {
+                displayValue = value; // If still invalid, show original string
+            } else {
+                displayValue = format(simpleParsedDate, "PPP");
+            }
         } catch (parseError) {
-            displayValue = value; // Fallback to original string if all parsing fails
+             displayValue = value; 
         }
       }
     } else if (isCurrency && typeof value === 'number') {
@@ -173,7 +189,7 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
             </div>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
-            {[...Array(10)].map((_, i) => (
+            {[...Array(12)].map((_, i) => ( // Increased skeleton count
               <div key={i} className="space-y-2">
                 <Skeleton className="h-4 w-1/4" />
                 <Skeleton className="h-6 w-3/4" />
@@ -303,10 +319,16 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
             <section>
               <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><Briefcase className="mr-2 h-5 w-5"/>Plan & Payment</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                <DetailItem icon={Tag} label="Plan Name" value={customer.planName || customer.planSelected} />
-                <DetailItem icon={CircleDollarSign} label="Plan Price" value={customer.planPrice} isCurrency />
+                <DetailItem icon={Tag} label="Current Plan Name" value={customer.currentPlanName || 'N/A'} />
+                <DetailItem icon={CircleDollarSign} label="Current Plan Price Paid" value={customer.planPricePaid} isCurrency />
+                <DetailItem icon={CalendarDays} label="Plan Start Date" value={customer.planStartDate} isDate />
+                <DetailItem icon={CalendarDays} label="Plan End Date" value={customer.planEndDate} isDate />
+                <DetailItem icon={Clock} label="Plan ESP Max Hours" value={customer.espCycleMaxHours ? `${customer.espCycleMaxHours} hrs` : 'N/A'} />
+                <DetailItem icon={Droplet} label="Plan ESP Max Days" value={customer.espCycleMaxDays ? `${customer.espCycleMaxDays} days` : 'N/A'} />
+                <DetailItem icon={Receipt} label="Payment Type (Initial)" value={customer.paymentType} />
                 <DetailItem icon={CircleDollarSign} label="Security Amount" value={customer.securityAmount} isCurrency />
-                <DetailItem icon={Receipt} label="Payment Type" value={customer.paymentType} />
+                <DetailItem icon={RotateCcwIcon} label="Last Recharge Date" value={customer.lastRechargeDate} isDate />
+                <DetailItem icon={Hash} label="Total Recharges" value={customer.rechargeCount ? String(customer.rechargeCount) : 'N/A'} />
               </div>
             </section>
 
@@ -334,3 +356,4 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
     </div>
   );
 }
+
