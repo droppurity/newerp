@@ -1,13 +1,12 @@
-
 // src/app/customer-details/[customerId]/page.tsx
 
 "use client";
 
-import React, { useEffect, useState, use, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react'; // Removed 'use' import
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, parseISO, isValid as isValidDate, formatDistanceToNow } from 'date-fns';
-import { cn } from "@/lib/utils"; // <<< --- ADDED THIS IMPORT
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from "@/components/ui/skeleton";
@@ -160,10 +159,9 @@ const DetailItem: React.FC<DetailItemProps> = ({
 };
 
 
-export default function CustomerDetailsPage({ params: paramsPromise }: { params: Promise<{ customerId: string }> }) {
+export default function CustomerDetailsPage({ params }: { params: { customerId: string } }) {
   const router = useRouter();
-  const resolvedParams = use(paramsPromise);
-  const customerId = resolvedParams.customerId;
+  const customerId = params.customerId; // Directly access customerId
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -362,4 +360,3 @@ export default function CustomerDetailsPage({ params: paramsPromise }: { params:
     </div>
   );
 }
-
