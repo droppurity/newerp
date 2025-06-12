@@ -19,7 +19,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  // AlertDialogDescription, // No longer directly used if children are block-level
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -65,6 +64,8 @@ interface RechargeConfirmationDetails {
   newPlanName?: string;
   newPlanPrice?: number;
   newPlanDurationDays?: number;
+  newPlanMaxHours?: number;
+  newPlanMaxLiters?: number;
 }
 
 export default function RechargePlanPage() {
@@ -213,17 +214,20 @@ export default function RechargePlanPage() {
     const currentPlanEndDate = foundCustomer.planEndDate ? parseISO(foundCustomer.planEndDate) : null;
     const isCurrentPlanActive = currentPlanEndDate && isFuture(currentPlanEndDate);
 
+    setRechargeConfirmationDetails({
+      currentPlanName: foundCustomer.currentPlanName || "N/A",
+      currentPlanEndDate: currentPlanEndDate ? format(currentPlanEndDate, "PPP") : "N/A",
+      newPlanName: newSelectedPlanDetails.planName,
+      newPlanPrice: newSelectedPlanDetails.price,
+      newPlanDurationDays: newSelectedPlanDetails.durationDays,
+      newPlanMaxHours: newSelectedPlanDetails.espCycleMaxHours,
+      newPlanMaxLiters: newSelectedPlanDetails.dailyWaterLimitLiters,
+    });
+
     if (isCurrentPlanActive) {
-      setRechargeConfirmationDetails({
-        currentPlanName: foundCustomer.currentPlanName || "Active Plan",
-        currentPlanEndDate: currentPlanEndDate ? format(currentPlanEndDate, "PPP") : "N/A",
-        newPlanName: newSelectedPlanDetails.planName,
-        newPlanPrice: newSelectedPlanDetails.price,
-        newPlanDurationDays: newSelectedPlanDetails.durationDays,
-      });
       setShowRechargeConfirmationDialog(true);
     } else {
-      // If no active plan, default to 'replace' logic (starts today)
+      // If no active plan, or plan expired, default to 'replace' logic (starts today)
       proceedWithRecharge('replace'); 
     }
   };
@@ -298,7 +302,8 @@ export default function RechargePlanPage() {
                                         {plansList.map(plan => (
                                             <SelectItem key={plan.planId} value={plan.planId}>
                                                 {plan.planName} - ₹{plan.price} ({plan.durationDays} days
-                                                {plan.espCycleMaxHours ? `, ${plan.espCycleMaxHours}hrs` : ''})
+                                                {plan.espCycleMaxHours ? `, ${plan.espCycleMaxHours}hrs` : ''}
+                                                {plan.dailyWaterLimitLiters ? `, ${plan.dailyWaterLimitLiters}L/day` : ''})
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -312,7 +317,8 @@ export default function RechargePlanPage() {
                             <p><strong>Name:</strong> {selectedPlanDetails.planName}</p>
                             <p><strong>Price:</strong> ₹{selectedPlanDetails.price}</p>
                             <p><strong>Duration:</strong> {selectedPlanDetails.durationDays} days</p>
-                            {selectedPlanDetails.espCycleMaxHours && <p><strong>Max Usage:</strong> {selectedPlanDetails.espCycleMaxHours} hours</p>}
+                            {selectedPlanDetails.espCycleMaxHours !== undefined && <p><strong>Max Usage Hours:</strong> {selectedPlanDetails.espCycleMaxHours} hours</p>}
+                            {selectedPlanDetails.dailyWaterLimitLiters !== undefined && <p><strong>Max Daily Liters:</strong> {selectedPlanDetails.dailyWaterLimitLiters} L/day</p>}
                           </div>
                         )}
 
@@ -349,11 +355,13 @@ export default function RechargePlanPage() {
                         <div><strong>Current Plan:</strong> {rechargeConfirmationDetails?.currentPlanName}</div>
                         <div><strong>Ends On:</strong> {rechargeConfirmationDetails?.currentPlanEndDate}</div>
                     </div>
-                    <div>New plan selected:</div>
-                     <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-md text-sm">
+                    <div>New plan selected for recharge:</div>
+                     <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-md text-sm space-y-0.5">
                         <div><strong>New Plan:</strong> {rechargeConfirmationDetails?.newPlanName}</div>
                         <div><strong>Price:</strong> ₹{rechargeConfirmationDetails?.newPlanPrice}</div>
                         <div><strong>Duration:</strong> {rechargeConfirmationDetails?.newPlanDurationDays} days</div>
+                        {rechargeConfirmationDetails?.newPlanMaxHours !== undefined && <div><strong>Max Hours:</strong> {rechargeConfirmationDetails.newPlanMaxHours} hrs</div>}
+                        {rechargeConfirmationDetails?.newPlanMaxLiters !== undefined && <div><strong>Max Liters/Day:</strong> {rechargeConfirmationDetails.newPlanMaxLiters} L</div>}
                     </div>
                     <div className="font-semibold">How would you like to apply the new plan?</div>
                   </div>
@@ -383,5 +391,3 @@ export default function RechargePlanPage() {
     </div>
   );
 }
-
-    

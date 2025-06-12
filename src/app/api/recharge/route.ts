@@ -1,7 +1,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { MongoClient, Db, ObjectId, MongoError } from 'mongodb';
-import { addDays, parseISO, isFuture } from 'date-fns'; // Added parseISO, isFuture
+import { addDays, parseISO, isFuture, isValid, format as formatDateFns } from 'date-fns'; // Added isValid and format
 
 // --- Environment Variables ---
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -103,22 +103,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: `Plan with ID ${planId} not found or is inactive.` }, { status: 404 });
     }
 
-    const currentDate = new Date();
-    let effectiveStartDateForNewPlanDuration = currentDate; // Base for calculating end date
-    let finalNewPlanEndDate;
+    const rechargeEventDate = new Date(); // When this recharge transaction occurs
+    let effectiveStartDateForNewPlanDuration = rechargeEventDate; // Base for calculating end date of the new service period
+    let currentPlanEndDateIsValidAndFuture = false;
 
-    if (rechargeType === 'add' && customer.planEndDate) {
-      const currentPlanEndDate = parseISO(customer.planEndDate);
-      if (isFuture(currentPlanEndDate)) {
-        effectiveStartDateForNewPlanDuration = currentPlanEndDate; // New plan duration starts after current one ends
+    if (rechargeType === 'add' && customer.planEndDate && typeof customer.planEndDate === 'string') {
+      try {
+        const parsedCurrentPlanEndDate = parseISO(customer.planEndDate);
+        if (isValid(parsedCurrentPlanEndDate) && isFuture(parsedCurrentPlanEndDate)) {
+          effectiveStartDateForNewPlanDuration = parsedCurrentPlanEndDate;
+          currentPlanEndDateIsValidAndFuture = true;
+          console.log(`API Route (recharge 'add'): Current plan valid and future. Effective start for new duration: ${formatDateFns(effectiveStartDateForNewPlanDuration, "PPP")}`);
+        } else {
+           console.log(`API Route (recharge 'add'): Current plan not future or invalid. Effective start for new duration: ${formatDateFns(effectiveStartDateForNewPlanDuration, "PPP")}`);
+        }
+      } catch (e) {
+        console.warn(`API Route (recharge 'add'): Error parsing customer.planEndDate "${customer.planEndDate}". Defaulting effective start to current date. Error:`, e);
       }
+    } else if (rechargeType === 'add') {
+        console.log(`API Route (recharge 'add'): No valid customer.planEndDate found. Effective start for new duration: ${formatDateFns(effectiveStartDateForNewPlanDuration, "PPP")}`);
     }
-    // If 'replace' or if current plan already expired, effectiveStartDateForNewPlanDuration remains `currentDate`.
 
-    finalNewPlanEndDate = addDays(effectiveStartDateForNewPlanDuration, newPlan.durationDays || 30);
 
-    // The actual start date of this recharge event is today.
-    const rechargeEventDate = currentDate; 
+    const finalNewPlanEndDate = addDays(effectiveStartDateForNewPlanDuration, newPlan.durationDays || 30);
+    // The 'planStartDate' in the customer document should reflect the actual start of the service period for this plan.
+    // For 'replace', it's today. For 'add' on an active plan, it's after the current plan ends.
+    const servicePeriodStartDate = (rechargeType === 'add' && currentPlanEndDateIsValidAndFuture)
+                                    ? effectiveStartDateForNewPlanDuration // Start new segment after old one
+                                    : rechargeEventDate;                  // Start new segment today
 
     const customerUpdateResult = await customersCollection.updateOne(
       { _id: customerObjectId },
@@ -126,22 +138,27 @@ export async function POST(request: NextRequest) {
         $set: { 
           currentPlanId: newPlan.planId,
           currentPlanName: newPlan.planName,
-          planPricePaid: newPlan.price, // Price for this specific recharge
-          planStartDate: rechargeEventDate, // When this recharge takes effect for billing/record
-          planEndDate: finalNewPlanEndDate, // The new absolute end date of service
-          espCycleMaxHours: newPlan.espCycleMaxHours || 0, // Limits for the new plan segment
-          espCycleMaxDays: newPlan.durationDays || 0,      // Duration of the new plan segment
-          currentTotalHours: 0, // Reset ESP's total running hours for the new cycle
-          lastRechargeDate: rechargeEventDate,
-          updatedAt: currentDate,
+          planPricePaid: newPlan.price, 
+          planStartDate: servicePeriodStartDate, 
+          planEndDate: finalNewPlanEndDate, 
+          espCycleMaxHours: newPlan.espCycleMaxHours || 0, 
+          espCycleMaxDays: newPlan.durationDays || 0,      
+          currentTotalHours: 0, 
+          lastRechargeDate: rechargeEventDate, // Date of this transaction
+          updatedAt: rechargeEventDate,
         },
         $inc: { rechargeCount: 1 } 
       }
     );
 
     if (customerUpdateResult.modifiedCount === 0 && customerUpdateResult.matchedCount === 0) {
-        return NextResponse.json({ success: false, message: 'Failed to update customer record (customer not found or no changes needed).' }, { status: 500 });
+        // This case should ideally not be hit if customer is found earlier.
+        return NextResponse.json({ success: false, message: 'Failed to update customer record (customer not found during update).' }, { status: 500 });
     }
+    if (customerUpdateResult.modifiedCount === 0 && customerUpdateResult.matchedCount > 0) {
+        console.warn(`API Route (recharge): Customer ${customer.generatedCustomerId} matched but no fields were modified. This might indicate identical data or an issue.`);
+    }
+
 
     const rechargeRecord = {
       customerId: customerObjectId,
@@ -149,24 +166,24 @@ export async function POST(request: NextRequest) {
       planId: newPlan.planId,
       planName: newPlan.planName,
       planPrice: newPlan.price,
-      planDurationDays: newPlan.durationDays,
+      planDurationDays: newPlan.durationDays || 0, // Ensure this has a value
       paymentMethod: paymentMethod,
-      rechargeDate: rechargeEventDate,
-      rechargeType: rechargeType, // Log how this recharge was applied
-      newPlanStartDate: rechargeEventDate, // Start of this particular recharge cycle
-      newPlanEndDate: finalNewPlanEndDate, // The resulting overall plan end date
+      rechargeDate: rechargeEventDate, // Date of this transaction
+      rechargeType: rechargeType, 
+      newPlanStartDate: servicePeriodStartDate, // Effective start of the service this recharge provides
+      newPlanEndDate: finalNewPlanEndDate, // The resulting overall plan end date for the customer
     };
     await rechargesCollection.insertOne(rechargeRecord);
 
-    console.log(`API Route (recharge): Recharge (${rechargeType}) processed for customer ${customer.customerName} (ID: ${customer.generatedCustomerId}), New Plan: ${newPlan.planName}`);
+    console.log(`API Route (recharge): Recharge (${rechargeType}) processed for customer ${customer.customerName} (ID: ${customer.generatedCustomerId}), New Plan: ${newPlan.planName}. Effective service start: ${formatDateFns(servicePeriodStartDate, "PPP")}, New End Date: ${formatDateFns(finalNewPlanEndDate, "PPP")}`);
     
     return NextResponse.json(
         { 
           success: true, 
-          message: `Plan "${newPlan.planName}" successfully recharged for ${customer.customerName} (${rechargeType} mode). New end date: ${format(finalNewPlanEndDate, "PPP")}`,
+          message: `Plan "${newPlan.planName}" successfully recharged for ${customer.customerName} (${rechargeType} mode). New end date: ${formatDateFns(finalNewPlanEndDate, "PPP")}`,
           rechargeDetails: {
             planEndDate: finalNewPlanEndDate.toISOString(),
-            newPlanStartDate: rechargeEventDate.toISOString(),
+            newPlanStartDate: servicePeriodStartDate.toISOString(), // Return the effective start of the service period
             customerName: customer.customerName,
             planName: newPlan.planName,
             rechargeType: rechargeType,
@@ -184,8 +201,8 @@ export async function POST(request: NextRequest) {
         errorMessage = 'Database operation failed during recharge.';
         statusCode = 503; 
     }
-    
-    return NextResponse.json({ success: false, message: errorMessage, details: error.message }, { status: statusCode });
+    // For other errors, error.message might be more specific
+    return NextResponse.json({ success: false, message: errorMessage, details: error.message || String(error) }, { status: statusCode });
   }
 }
     
