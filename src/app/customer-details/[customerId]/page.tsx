@@ -30,15 +30,15 @@ import {
   FileText, CalendarDays, Clock, Tag, ShieldCheck, BarChart3, Users, AlertTriangle,
   Building, Hash, CircleDollarSign, Wrench, Receipt, LogOut, ArrowLeft, LinkIcon, ExternalLink, Droplets as AppIcon,
   RotateCcwIcon, History, Wifi, Activity, Hourglass, ListRestart, Zap, Loader2, ListChecks, Banknote,
-  PlusSquare, Replace, Search as SearchIcon, PackageIcon, Water
+  PlusSquare, Replace, Search as SearchIcon, PackageIcon, GlassWater
 } from 'lucide-react';
 
 interface LastUsageEntry {
-  timestamp: string; 
+  timestamp: string;
   dailyHoursReported: number;
   totalHoursReported: number;
-  dailyLitersUsed?: number;      
-  totalLitersUsedInCycle?: number; 
+  dailyLitersUsed?: number;
+  totalLitersUsedInCycle?: number;
 }
 interface Customer {
   _id: string;
@@ -73,7 +73,7 @@ interface Customer {
   planPricePaid?: number;
   planStartDate?: string;
   planEndDate?: string;
-  dailyWaterLimitLiters?: number; 
+  dailyWaterLimitLiters?: number;
   currentPlanDailyLitersLimit?: number; // New: For current plan's daily limit
   currentPlanTotalLitersLimit?: number; // New: For current plan's total cycle limit
   espCycleMaxHours?: number;
@@ -85,11 +85,11 @@ interface Customer {
   registeredAt?: string;
   driveUrl?: string | null;
 
-  lastContact?: string | null; 
+  lastContact?: string | null;
   currentTotalHours?: number;
-  currentTotalLitersUsed?: number; 
+  currentTotalLitersUsed?: number;
   lastUsage?: LastUsageEntry[] | null;
-  updatedAt?: string; 
+  updatedAt?: string;
 }
 
 interface RechargeHistoryItem {
@@ -100,14 +100,14 @@ interface RechargeHistoryItem {
   planName: string;
   planPrice: number;
   planDurationDays: number;
-  dailyWaterLimitLiters?: number; 
-  totalLitersLimitForCycle?: number; // New
-  espCycleMaxHours?: number;      
+  dailyWaterLimitLiters?: number;
+  totalLitersLimitForCycle?: number;
+  espCycleMaxHours?: number;
   paymentMethod: string;
-  rechargeDate: string; 
+  rechargeDate: string;
   rechargeType?: 'replace' | 'add';
-  newPlanStartDate: string; 
-  newPlanEndDate: string; 
+  newPlanStartDate: string;
+  newPlanEndDate: string;
   transactionId?: string;
 }
 
@@ -133,9 +133,9 @@ interface PlanFromAPI {
   planName: string;
   price: number;
   durationDays: number;
-  espCycleMaxHours?: number;     
-  dailyWaterLimitLiters?: number; 
-  totalLitersLimitForCycle?: number; // New
+  espCycleMaxHours?: number;
+  dailyWaterLimitLiters?: number;
+  totalLitersLimitForCycle?: number;
 }
 
 interface RechargeConfirmationDetails {
@@ -144,9 +144,9 @@ interface RechargeConfirmationDetails {
   newPlanName?: string;
   newPlanPrice?: number;
   newPlanDurationDays?: number;
-  newPlanMaxHours?: number;         
-  newPlanMaxLitersPerDay?: number;  
-  newPlanTotalLitersForCycle?: number; // New
+  newPlanMaxHours?: number;
+  newPlanMaxLitersPerDay?: number;
+  newPlanTotalLitersForCycle?: number;
 }
 
 
@@ -183,7 +183,7 @@ const DetailItem: React.FC<DetailItemProps> = ({
             displayValue = format(parsedDate, isDateTime ? "PPP p" : "PPP");
         }
       } catch (e) {
-         displayValue = value; 
+         displayValue = value;
       }
     } else if (isCurrency) {
       const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -206,8 +206,8 @@ const DetailItem: React.FC<DetailItemProps> = ({
 
 export default function CustomerDetailsPage({ params }: { params: Promise<{ customerId: string }> }) {
   const resolvedParams = use(params);
-  const customerId = resolvedParams.customerId; 
-  
+  const customerId = resolvedParams.customerId;
+
   const router = useRouter();
   const { toast } = useToast();
 
@@ -297,7 +297,7 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
       }
     } catch (error: any) {
       setPlanFetchError(error.message || "Could not retrieve plans.");
-      setPlansList([]); 
+      setPlansList([]);
     } finally {
       setIsLoadingPlans(false);
     }
@@ -321,17 +321,17 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
   const proceedWithRecharge = async (rechargeType: 'replace' | 'add') => {
     if (!customer || !selectedPlanId || !paymentMethod) {
         toast({ variant: "destructive", title: "Error", description: "Missing customer, plan, or payment method details." });
-        setIsRecharging(false); 
+        setIsRecharging(false);
         setShowRechargeConfirmationDialog(false);
         return;
     }
     setIsRecharging(true);
     try {
-      const rechargeData = { 
-        customerId: customer._id, 
-        planId: selectedPlanId, 
+      const rechargeData = {
+        customerId: customer._id,
+        planId: selectedPlanId,
         paymentMethod,
-        rechargeType 
+        rechargeType
       };
       const response = await fetch('/api/recharge', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rechargeData),
@@ -339,7 +339,7 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
       const result = await response.json();
       if (response.ok && result.success) {
         toast({ title: "Recharge Successful", description: result.message, variant: "success" });
-        setSelectedPlanId(''); 
+        setSelectedPlanId('');
         setPaymentMethod('');
         fetchCustomerDetails();
         fetchRechargeHistory();
@@ -383,7 +383,7 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
     if (isCurrentPlanActive) {
       setShowRechargeConfirmationDialog(true);
     } else {
-      proceedWithRecharge('replace'); 
+      proceedWithRecharge('replace');
     }
   };
 
@@ -442,7 +442,7 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
                 <DetailItem icon={CircleDollarSign} label="Current Plan Price Paid" value={customer.planPricePaid} isCurrency />
                 <DetailItem icon={CalendarDays} label="Plan Start Date" value={customer.planStartDate} isDate />
                 <DetailItem icon={CalendarDays} label="Plan End Date" value={customer.planEndDate} isDate />
-                <DetailItem icon={Water} label="Daily Water Limit (Plan)" value={customer.currentPlanDailyLitersLimit ? `${customer.currentPlanDailyLitersLimit} L/day` : (customer.dailyWaterLimitLiters ? `${customer.dailyWaterLimitLiters} L/day` : 'N/A')} />
+                <DetailItem icon={GlassWater} label="Daily Water Limit (Plan)" value={customer.currentPlanDailyLitersLimit ? `${customer.currentPlanDailyLitersLimit} L/day` : (customer.dailyWaterLimitLiters ? `${customer.dailyWaterLimitLiters} L/day` : 'N/A')} />
                 <DetailItem icon={PackageIcon} label="Total Water Limit (Cycle)" value={customer.currentPlanTotalLitersLimit ? `${customer.currentPlanTotalLitersLimit} L` : 'N/A'} />
                 <DetailItem icon={Hourglass} label="Plan ESP Max Hours (Cycle)" value={customer.espCycleMaxHours ? `${customer.espCycleMaxHours} hrs` : 'N/A'} />
                 <DetailItem icon={CalendarDays} label="Plan ESP Max Days (Cycle)" value={customer.espCycleMaxDays ? `${customer.espCycleMaxDays} days` : 'N/A'} />
@@ -458,12 +458,12 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                 <DetailItem icon={Wifi} label="Last Contact Time" value={customer.lastContact} isDateTime />
                 <DetailItem icon={Clock} label="Current Cycle Total Hours Used" value={customer.currentTotalHours ? `${customer.currentTotalHours.toFixed(2)} hrs` : 'N/A'} />
-                <DetailItem icon={Droplet} label="Current Cycle Total Liters Used" value={customer.currentTotalLitersUsed ? `${customer.currentTotalLitersUsed.toFixed(2)} L` : 'N/A'} />
+                <DetailItem icon={GlassWater} label="Current Cycle Total Liters Used" value={customer.currentTotalLitersUsed ? `${customer.currentTotalLitersUsed.toFixed(2)} L` : 'N/A'} />
 
                 {latestUsage ? (
                   <>
                     <DetailItem icon={Hourglass} label="Last Reported Daily Hours" value={latestUsage.dailyHoursReported ? `${latestUsage.dailyHoursReported.toFixed(2)} hrs` : 'N/A'} />
-                    <DetailItem icon={Droplet} label="Last Reported Daily Liters" value={latestUsage.dailyLitersUsed ? `${latestUsage.dailyLitersUsed.toFixed(2)} L` : 'N/A'} />
+                    <DetailItem icon={GlassWater} label="Last Reported Daily Liters" value={latestUsage.dailyLitersUsed ? `${latestUsage.dailyLitersUsed.toFixed(2)} L` : 'N/A'} />
                     <DetailItem icon={CalendarDays} label="Timestamp of Last Report" value={latestUsage.timestamp} isDateTime className="md:col-span-2"/>
                   </>
                 ) : (
@@ -510,7 +510,7 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
                 </div>
               )}
             </section>
-            
+
             <section>
               <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><Zap className="mr-2 h-5 w-5"/>Recharge Plan Now</h3>
                <div className="space-y-4 p-4 border rounded-md bg-muted/10">
@@ -616,3 +616,4 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
     </div>
   );
 }
+
