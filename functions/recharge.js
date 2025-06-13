@@ -10,9 +10,6 @@ let cachedDb = null;
 
 async function connectToDatabase() {
   if (cachedDb) {
-    // Ensure the connection is still active if possible, or simply return cachedDb
-    // For MongoClient, the instance itself holds the pool.
-    // A more robust check might involve client.topology.isConnected() if you cache the client
     return cachedDb;
   }
    if (!uri) {
@@ -39,14 +36,21 @@ exports.handler = async (event, context) => {
   const authHeader = event.headers.authorization;
    if (!secretKey) {
     console.error('RECHARGE.JS: SERVER ERROR - SECRET_KEY is not set in Netlify environment variables.');
-    return { statusCode: 500, body: JSON.stringify({ message: 'Server configuration error: API key not set.' }), headers: { 'Content-Type': 'application/json' } };
+    // Using temporary hardcoded key "1234" for fallback if SECRET_KEY env var is missing
+    if (!authHeader || authHeader !== `Bearer 1234`) {
+      console.warn('RECHARGE.JS: Unauthorized (env key missing, fallback check). Auth Header:', authHeader ? authHeader.substring(0,15) + '...' : 'NONE');
+      return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key (fallback).' }), headers: { 'Content-Type': 'application/json' } };
+    }
+    console.log('RECHARGE.JS: Authorization successful using fallback key.');
+  } else {
+    // Primary check using SECRET_KEY from environment
+    if (!authHeader || authHeader !== `Bearer ${secretKey}`) {
+      console.warn('RECHARGE.JS: Unauthorized access attempt. Invalid or missing API key. Auth Header Received:', authHeader ? authHeader.substring(0,15) + '...' : 'NONE');
+      return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }), headers: { 'Content-Type': 'application/json' } };
+    }
+    console.log('RECHARGE.JS: Authorization successful using environment SECRET_KEY.');
   }
-  // Using your temporary secret key "1234"
-  if (!authHeader || authHeader !== `Bearer 1234`) { 
-    console.warn('RECHARGE.JS: Unauthorized access attempt. Invalid or missing API key. Auth Header Received:', authHeader ? authHeader.substring(0,15) + '...' : 'NONE');
-    return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }), headers: { 'Content-Type': 'application/json' } };
-  }
-  console.log('RECHARGE.JS: Authorization successful.');
+
 
   const customerId = event.queryStringParameters && event.queryStringParameters.customerId; // This is generatedCustomerId
 
@@ -60,22 +64,20 @@ exports.handler = async (event, context) => {
     const db = await connectToDatabase();
     const customersCollection = db.collection('customers'); 
 
-    // Find customer by generatedCustomerId (which is what the ESP uses)
     const customerData = await customersCollection.findOne({ generatedCustomerId: customerId });
 
     if (!customerData) {
       console.warn(`RECHARGE.JS: Customer with generated ID ${customerId} not found.`);
       return {
-        statusCode: 404, // This 404 is *from within the function*, meaning customer not found in DB
+        statusCode: 404, 
         body: JSON.stringify({ message: `Customer with generated ID ${customerId} not found.` }),
         headers: { 'Content-Type': 'application/json' },
       };
     }
     console.log('RECHARGE.JS: Customer data found:', customerData.customerName, customerData.generatedCustomerId);
-    console.log('RECHARGE.JS: Customer plan details from DB - espCycleMaxHours:', customerData.espCycleMaxHours, 'espCycleMaxDays:', customerData.espCycleMaxDays);
+    console.log('RECHARGE.JS: Customer plan details from DB - espCycleMaxHours:', customerData.espCycleMaxHours, 'espCycleMaxDays:', customerData.espCycleMaxDays, 'currentPlanDailyLitersLimit:', customerData.currentPlanDailyLitersLimit, 'currentPlanTotalLitersLimit:', customerData.currentPlanTotalLitersLimit);
 
 
-    // Update last contact timestamp for this customer
     try {
         const updateResult = await customersCollection.updateOne(
           { generatedCustomerId: customerId },
@@ -90,13 +92,14 @@ exports.handler = async (event, context) => {
         }
     } catch (updateError) {
         console.error('RECHARGE.JS: Error updating lastContact for customer:', customerId, updateError);
-        // Non-fatal error, proceed with returning data
     }
     
     const responseBody = {
         customerId: customerData.generatedCustomerId, 
         maxHours: customerData.espCycleMaxHours !== undefined ? customerData.espCycleMaxHours : 0, 
         maxDays: customerData.espCycleMaxDays !== undefined ? customerData.espCycleMaxDays : 0,
+        maxDailyLiters: customerData.currentPlanDailyLitersLimit !== undefined ? customerData.currentPlanDailyLitersLimit : 0,
+        maxTotalLiters: customerData.currentPlanTotalLitersLimit !== undefined ? customerData.currentPlanTotalLitersLimit : 0,
     };
     console.log('RECHARGE.JS: Responding with:', responseBody);
     return {
@@ -113,6 +116,4 @@ exports.handler = async (event, context) => {
     };
   }
 };
-    
-
     

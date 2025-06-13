@@ -106,11 +106,17 @@ export async function POST(request: NextRequest) {
     const planDurationDays = newPlan.durationDays || 0;
     const planDailyWaterLimitLiters = newPlan.dailyWaterLimitLiters || 0;
     let planEspCycleMaxHours = newPlan.espCycleMaxHours;
+    let planTotalLitersLimitForCycle = newPlan.totalLitersLimitForCycle;
 
     if ((!planEspCycleMaxHours || planEspCycleMaxHours === 0) && planDurationDays > 0 && planDailyWaterLimitLiters > 0) {
         planEspCycleMaxHours = Math.round(((planDurationDays * planDailyWaterLimitLiters) / 15) * 100) / 100;
     }
     planEspCycleMaxHours = planEspCycleMaxHours || 0;
+
+    if ((!planTotalLitersLimitForCycle || planTotalLitersLimitForCycle === 0) && planDurationDays > 0 && planDailyWaterLimitLiters > 0) {
+        planTotalLitersLimitForCycle = planDurationDays * planDailyWaterLimitLiters;
+    }
+    planTotalLitersLimitForCycle = planTotalLitersLimitForCycle || 0;
 
 
     const rechargeEventDate = new Date(); 
@@ -154,7 +160,9 @@ export async function POST(request: NextRequest) {
           planPricePaid: newPlan.price, 
           planStartDate: servicePeriodStartDate, 
           planEndDate: finalNewPlanEndDate, 
-          dailyWaterLimitLiters: planDailyWaterLimitLiters, // Store daily limit for current plan
+          dailyWaterLimitLiters: planDailyWaterLimitLiters, // Daily liter limit for current plan
+          currentPlanDailyLitersLimit: planDailyWaterLimitLiters, // Explicitly store daily limit
+          currentPlanTotalLitersLimit: planTotalLitersLimitForCycle, // Explicitly store total cycle liter limit
           espCycleMaxHours: planEspCycleMaxHours,      // Total hours for this plan cycle
           espCycleMaxDays: planDurationDays,           // Days for this plan cycle
           currentTotalHours: 0, // Reset for new/extended cycle
@@ -181,6 +189,7 @@ export async function POST(request: NextRequest) {
       planPrice: newPlan.price,
       planDurationDays: planDurationDays,
       dailyWaterLimitLiters: planDailyWaterLimitLiters,
+      totalLitersLimitForCycle: planTotalLitersLimitForCycle,
       espCycleMaxHours: planEspCycleMaxHours,
       paymentMethod: paymentMethod,
       rechargeDate: rechargeEventDate,

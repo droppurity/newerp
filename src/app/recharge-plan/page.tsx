@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { 
-  Droplets, LogOut, Search as SearchIcon, Zap, LayoutDashboard, Loader2, AlertCircle, ListChecks, Banknote, CheckCircle, AlertTriangle, PlusSquare, Replace
+  Droplets, LogOut, Search as SearchIcon, Zap, LayoutDashboard, Loader2, AlertCircle, ListChecks, Banknote, CheckCircle, AlertTriangle, PlusSquare, Replace, Droplet
 } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,7 +44,9 @@ interface Customer {
   planEndDate?: string; 
   espCycleMaxHours?: number;
   espCycleMaxDays?: number;
-  dailyWaterLimitLiters?: number;
+  dailyWaterLimitLiters?: number; // Used for current daily limit display
+  currentPlanDailyLitersLimit?: number; // More specific field for current plan's daily limit
+  currentPlanTotalLitersLimit?: number; // Current plan's total liter limit for cycle
   lastRechargeDate?: string; 
   rechargeCount?: number;
 }
@@ -55,8 +57,9 @@ interface PlanFromAPI {
   planName: string;
   price: number;
   durationDays: number;
-  espCycleMaxHours?: number;     // Total hours for the plan's duration
-  dailyWaterLimitLiters?: number; // Liters per day
+  espCycleMaxHours?: number;     
+  dailyWaterLimitLiters?: number; 
+  totalLitersLimitForCycle?: number; // New: total liters for cycle
 }
 
 interface RechargeConfirmationDetails {
@@ -65,8 +68,9 @@ interface RechargeConfirmationDetails {
   newPlanName?: string;
   newPlanPrice?: number;
   newPlanDurationDays?: number;
-  newPlanMaxHours?: number;         // Total hours for the new plan
-  newPlanMaxLitersPerDay?: number;  // Daily liter limit for the new plan
+  newPlanMaxHours?: number;         
+  newPlanMaxLitersPerDay?: number;  
+  newPlanTotalLitersForCycle?: number; // New: total liters for new plan cycle
 }
 
 export default function RechargePlanPage() {
@@ -223,6 +227,7 @@ export default function RechargePlanPage() {
       newPlanDurationDays: newSelectedPlanDetails.durationDays,
       newPlanMaxHours: newSelectedPlanDetails.espCycleMaxHours, 
       newPlanMaxLitersPerDay: newSelectedPlanDetails.dailyWaterLimitLiters,
+      newPlanTotalLitersForCycle: newSelectedPlanDetails.totalLitersLimitForCycle,
     });
 
     if (isCurrentPlanActive) {
@@ -287,6 +292,8 @@ export default function RechargePlanPage() {
                             <p><strong>Phone:</strong> {foundCustomer.customerPhone || 'N/A'}</p>
                             <p><strong>Current Plan:</strong> {foundCustomer.currentPlanName || 'N/A'}</p>
                             <p><strong>Plan Ends:</strong> {foundCustomer.planEndDate ? new Date(foundCustomer.planEndDate).toLocaleDateString() : 'N/A'}</p>
+                            <p><strong>Daily Liters:</strong> {foundCustomer.currentPlanDailyLitersLimit ? `${foundCustomer.currentPlanDailyLitersLimit} L` : (foundCustomer.dailyWaterLimitLiters ? `${foundCustomer.dailyWaterLimitLiters} L` : 'N/A')}</p>
+                            <p><strong>Total Cycle Liters:</strong> {foundCustomer.currentPlanTotalLitersLimit ? `${foundCustomer.currentPlanTotalLitersLimit} L` : 'N/A'}</p>
                         </div>
                         
                         <div className="space-y-2">
@@ -301,8 +308,9 @@ export default function RechargePlanPage() {
                                         {plansList.map(plan => (
                                             <SelectItem key={plan.planId} value={plan.planId}>
                                                 {plan.planName} - ₹{plan.price} ({plan.durationDays} days
-                                                {plan.espCycleMaxHours ? `, ${plan.espCycleMaxHours}hrs` : ''}
-                                                {plan.dailyWaterLimitLiters ? `, ${plan.dailyWaterLimitLiters}L/day` : ''})
+                                                {plan.dailyWaterLimitLiters ? `, ${plan.dailyWaterLimitLiters}L/day` : ''}
+                                                {plan.totalLitersLimitForCycle ? `, ${plan.totalLitersLimitForCycle}L total` : ''}
+                                                {plan.espCycleMaxHours ? `, ${plan.espCycleMaxHours}hrs` : ''})
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -316,8 +324,9 @@ export default function RechargePlanPage() {
                             <p><strong>Name:</strong> {selectedPlanDetails.planName}</p>
                             <p><strong>Price:</strong> ₹{selectedPlanDetails.price}</p>
                             <p><strong>Duration:</strong> {selectedPlanDetails.durationDays} days</p>
-                            {selectedPlanDetails.espCycleMaxHours !== undefined && <p><strong>Total Max Hours:</strong> {selectedPlanDetails.espCycleMaxHours} hours</p>}
                             {selectedPlanDetails.dailyWaterLimitLiters !== undefined && <p><strong>Max Daily Liters:</strong> {selectedPlanDetails.dailyWaterLimitLiters} L/day</p>}
+                            {selectedPlanDetails.totalLitersLimitForCycle !== undefined && <p><strong>Total Cycle Liters:</strong> {selectedPlanDetails.totalLitersLimitForCycle} L</p>}
+                            {selectedPlanDetails.espCycleMaxHours !== undefined && <p><strong>Total Max Hours:</strong> {selectedPlanDetails.espCycleMaxHours} hours</p>}
                           </div>
                         )}
 
@@ -359,8 +368,9 @@ export default function RechargePlanPage() {
                         <div><strong>New Plan:</strong> {rechargeConfirmationDetails?.newPlanName}</div>
                         <div><strong>Price:</strong> ₹{rechargeConfirmationDetails?.newPlanPrice?.toFixed(2)}</div>
                         <div><strong>Duration:</strong> {rechargeConfirmationDetails?.newPlanDurationDays} days</div>
-                        {rechargeConfirmationDetails?.newPlanMaxHours !== undefined && <div><strong>Total Max Hours:</strong> {rechargeConfirmationDetails.newPlanMaxHours} hrs</div>}
                         {rechargeConfirmationDetails?.newPlanMaxLitersPerDay !== undefined && <div><strong>Max Liters/Day:</strong> {rechargeConfirmationDetails.newPlanMaxLitersPerDay} L</div>}
+                        {rechargeConfirmationDetails?.newPlanTotalLitersForCycle !== undefined && <div><strong>Total Cycle Liters:</strong> {rechargeConfirmationDetails.newPlanTotalLitersForCycle} L</div>}
+                        {rechargeConfirmationDetails?.newPlanMaxHours !== undefined && <div><strong>Total Max Hours:</strong> {rechargeConfirmationDetails.newPlanMaxHours} hrs</div>}
                     </div>
                     <div className="font-semibold">How would you like to apply the new plan?</div>
                   </div>

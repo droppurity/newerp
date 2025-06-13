@@ -3,7 +3,7 @@
 const { MongoClient } = require('mongodb');
 
 const uri = process.env.MONGODB_URI;
-const secretKey = "1234"; // TEMPORARY hardcoded key for testing
+const secretKey = process.env.SECRET_KEY; // Use environment variable
 const dbName = process.env.DB_NAME || 'droppurityDB';
 
 let cachedDb = null;
@@ -35,14 +35,22 @@ exports.handler = async (event, context) => {
 
   const authHeader = event.headers.authorization;
   if (!secretKey) { 
-    console.error('SAVE_DATA.JS: SERVER ERROR - SECRET_KEY is not set (hardcoded for test).');
-    return { statusCode: 500, body: JSON.stringify({ message: 'Server configuration error: API key not set.' }), headers: { 'Content-Type': 'application/json' } };
+    console.error('SAVE_DATA.JS: SERVER ERROR - SECRET_KEY is not set in Netlify environment variables.');
+    // Using temporary hardcoded key "1234" for fallback if SECRET_KEY env var is missing
+    if (!authHeader || authHeader !== `Bearer 1234`) {
+      console.warn('SAVE_DATA.JS: Unauthorized (env key missing, fallback check). Auth Header:', authHeader ? authHeader.substring(0,15) + '...' : 'NONE');
+      return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key (fallback).' }), headers: { 'Content-Type': 'application/json' } };
+    }
+     console.log('SAVE_DATA.JS: Authorization successful using fallback key "1234".');
+  } else {
+     // Primary check using SECRET_KEY from environment
+    if (!authHeader || authHeader !== `Bearer ${secretKey}`) {
+      console.warn('SAVE_DATA.JS: Unauthorized access attempt. Invalid or missing API key. Auth Header Received:', authHeader ? authHeader.substring(0,15) + '...' : 'NONE');
+      return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }), headers: { 'Content-Type': 'application/json' } };
+    }
+    console.log('SAVE_DATA.JS: Authorization successful using environment SECRET_KEY.');
   }
-  if (!authHeader || authHeader !== `Bearer ${secretKey}`) {
-    console.warn('SAVE_DATA.JS: Unauthorized access attempt. Invalid or missing API key. Auth Header Received:', authHeader ? authHeader.substring(0,15) + '...' : 'NONE');
-    return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }), headers: { 'Content-Type': 'application/json' } };
-  }
-  console.log('SAVE_DATA.JS: Authorization successful.');
+
 
   let data;
   try {
@@ -72,8 +80,8 @@ exports.handler = async (event, context) => {
       timestamp: new Date(),
       dailyHoursReported: dailyHours,
       totalHoursReported: totalHours, 
-      dailyLitersUsed: dailyLitersUsed,
-      totalLitersUsedInCycle: totalLitersUsedInCycle,
+      dailyLitersUsed: dailyLitersUsed, // Calculated daily liters
+      totalLitersUsedInCycle: totalLitersUsedInCycle, // Calculated total liters for cycle
     };
 
     const result = await customersCollection.updateOne(

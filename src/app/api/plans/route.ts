@@ -76,16 +76,22 @@ export async function GET(request: NextRequest) {
 
     const serializablePlans = activePlans.map(plan => {
       let espCycleMaxHours = plan.espCycleMaxHours;
-      // Calculate espCycleMaxHours if not present or zero, based on 1 hour = 15 liters
       if ((!espCycleMaxHours || espCycleMaxHours === 0) && plan.durationDays && plan.dailyWaterLimitLiters) {
         espCycleMaxHours = Math.round(((plan.durationDays * plan.dailyWaterLimitLiters) / 15) * 100) / 100;
       }
 
+      let totalLitersLimitForCycle = plan.totalLitersLimitForCycle;
+      if ((!totalLitersLimitForCycle || totalLitersLimitForCycle === 0) && plan.durationDays && plan.dailyWaterLimitLiters) {
+        totalLitersLimitForCycle = plan.durationDays * plan.dailyWaterLimitLiters;
+      }
+
+
       return {
         ...plan,
         _id: plan._id.toString(),
-        espCycleMaxHours: espCycleMaxHours || 0, // Ensure it's a number, defaults to 0
-        dailyWaterLimitLiters: plan.dailyWaterLimitLiters || 0, // Ensure it's a number, defaults to 0
+        espCycleMaxHours: espCycleMaxHours || 0,
+        dailyWaterLimitLiters: plan.dailyWaterLimitLiters || 0,
+        totalLitersLimitForCycle: totalLitersLimitForCycle || 0,
       };
     });
 

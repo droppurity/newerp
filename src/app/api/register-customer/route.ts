@@ -103,10 +103,15 @@ export async function POST(request: NextRequest) {
     if (isNaN(parsedInstallationDate.getTime())) {
         return NextResponse.json({ success: false, message: 'Invalid installation date format.' }, { status: 400 });
     }
-    const planEndDate = addDays(parsedInstallationDate, plan.durationDays || 30); // Default to 30 days if duration not set
+    const planEndDate = addDays(parsedInstallationDate, plan.durationDays || 30); 
+
+    let planTotalLitersLimit = plan.totalLitersLimitForCycle;
+    if ((!planTotalLitersLimit || planTotalLitersLimit === 0) && plan.durationDays && plan.dailyWaterLimitLiters) {
+      planTotalLitersLimit = plan.durationDays * plan.dailyWaterLimitLiters;
+    }
 
     const customerDocument: any = {
-      ...otherRegistrationData, // Includes securityAmount, aadhaarNo, etc.
+      ...otherRegistrationData, 
       customerName,
       customerPhone,
       generatedCustomerId,
@@ -114,25 +119,27 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
       currentPlanId: plan.planId,
       currentPlanName: plan.planName,
-      planPricePaid: plan.price, // Price of the initial plan
+      planPricePaid: plan.price, 
       planStartDate: parsedInstallationDate,
       planEndDate: planEndDate,
-      espCycleMaxHours: plan.espCycleMaxHours || 0, // ESP total hours for this plan cycle
-      espCycleMaxDays: plan.durationDays || 0,     // ESP days for this plan cycle
-      currentTotalHours: 0, // ESP's total running hours for current cycle, starts at 0
-      lastRechargeDate: parsedInstallationDate, // Initial plan activation
+      dailyWaterLimitLiters: plan.dailyWaterLimitLiters || 0,
+      currentPlanDailyLitersLimit: plan.dailyWaterLimitLiters || 0,
+      currentPlanTotalLitersLimit: planTotalLitersLimit || 0,
+      espCycleMaxHours: plan.espCycleMaxHours || 0, 
+      espCycleMaxDays: plan.durationDays || 0,     
+      currentTotalHours: 0, 
+      currentTotalLitersUsed: 0,
+      lastRechargeDate: parsedInstallationDate, 
       rechargeCount: 1,
       lastUsage: [],
       lastContact: new Date(),
     };
 
-    // Remove image data URLs if they were sent
     delete customerDocument.aadhaarFrontPhotoDataUrl;
     delete customerDocument.customerPhotoDataUrl;
     delete customerDocument.aadhaarBackPhotoDataUrl;
     delete customerDocument.signatureDataUrl;
     delete customerDocument.termsContentSnapshot;
-    // Retain mapLatitude, mapLongitude if they are actual numbers
     if (typeof customerDocument.mapLatitude !== 'number') delete customerDocument.mapLatitude;
     if (typeof customerDocument.mapLongitude !== 'number') delete customerDocument.mapLongitude;
 
@@ -140,7 +147,6 @@ export async function POST(request: NextRequest) {
     const result = await customersCollection.insertOne(customerDocument);
     const customerMongoId = result.insertedId;
 
-    // Create initial recharge log entry
     const initialRechargeLog = {
       customerId: customerMongoId,
       customerGeneratedId: generatedCustomerId,
@@ -148,11 +154,14 @@ export async function POST(request: NextRequest) {
       planName: plan.planName,
       planPrice: plan.price,
       planDurationDays: plan.durationDays,
+      dailyWaterLimitLiters: plan.dailyWaterLimitLiters || 0,
+      totalLitersLimitForCycle: planTotalLitersLimit || 0,
+      espCycleMaxHours: plan.espCycleMaxHours || 0,
       paymentMethod: otherRegistrationData.paymentType || 'InitialSetup',
       rechargeDate: parsedInstallationDate,
       newPlanStartDate: parsedInstallationDate,
       newPlanEndDate: planEndDate,
-      transactionId: `REG-${generatedCustomerId}` // Example transaction ID for registration
+      transactionId: `REG-${generatedCustomerId}` 
     };
     await rechargesCollection.insertOne(initialRechargeLog);
     
