@@ -35,10 +35,12 @@ import {
 
 interface LastUsageEntry {
   timestamp: string;
-  dailyHoursReported: number;
-  totalHoursReported: number;
-  dailyLitersUsed?: number;
-  totalLitersUsedInCycle?: number;
+  dailyHoursReported?: number; // Kept for devices that only report hours
+  totalHoursReported?: number;  // Kept for devices that only report hours
+  dailyLitersReported?: number; // Direct from ESP with flow sensor
+  totalLitersReportedInCycle?: number; // Direct from ESP with flow sensor
+  dailyLitersCalculated?: number; // Calculated if only hours reported
+  totalLitersCalculatedInCycle?: number; // Calculated if only hours reported
 }
 interface Customer {
   _id: string;
@@ -73,9 +75,9 @@ interface Customer {
   planPricePaid?: number;
   planStartDate?: string;
   planEndDate?: string;
-  dailyWaterLimitLiters?: number;
-  currentPlanDailyLitersLimit?: number; // New: For current plan's daily limit
-  currentPlanTotalLitersLimit?: number; // New: For current plan's total cycle limit
+  dailyWaterLimitLiters?: number; // This might be the legacy field if currentPlanDailyLitersLimit is not set
+  currentPlanDailyLitersLimit?: number;
+  currentPlanTotalLitersLimit?: number;
   espCycleMaxHours?: number;
   espCycleMaxDays?: number;
   lastRechargeDate?: string;
@@ -86,8 +88,8 @@ interface Customer {
   driveUrl?: string | null;
 
   lastContact?: string | null;
-  currentTotalHours?: number;
-  currentTotalLitersUsed?: number;
+  currentTotalHours?: number; // Still useful for hour-based tracking/diagnostics
+  currentTotalLitersUsed?: number; // This will be updated by direct totalLiters from ESP if available
   lastUsage?: LastUsageEntry[] | null;
   updatedAt?: string;
 }
@@ -414,6 +416,16 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
   const fullAddress = [ customer.customerAddress, customer.landmark, customer.city, customer.stateName, customer.pincode, customer.country ].filter(Boolean).join(', ');
   const latestUsage = customer.lastUsage && customer.lastUsage.length > 0 ? customer.lastUsage[customer.lastUsage.length - 1] : null;
 
+  const getDisplayDailyLiters = () => {
+    if (latestUsage?.dailyLitersReported !== undefined) {
+        return `${latestUsage.dailyLitersReported.toFixed(2)} L (Direct)`;
+    } else if (latestUsage?.dailyLitersCalculated !== undefined) {
+        return `${latestUsage.dailyLitersCalculated.toFixed(2)} L (Calculated)`;
+    }
+    return 'N/A';
+  };
+
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-muted/10">
        <header className="p-4 sm:p-6 border-b sticky top-0 bg-background/95 backdrop-blur-sm z-10 shadow-sm">
@@ -457,13 +469,16 @@ export default function CustomerDetailsPage({ params }: { params: Promise<{ cust
               <h3 className="text-lg font-semibold mb-3 border-b pb-2 text-primary flex items-center"><Activity className="mr-2 h-5 w-5"/>Device Sync Status</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                 <DetailItem icon={Wifi} label="Last Contact Time" value={customer.lastContact} isDateTime />
-                <DetailItem icon={Clock} label="Current Cycle Total Hours Used" value={customer.currentTotalHours ? `${customer.currentTotalHours.toFixed(2)} hrs` : 'N/A'} />
                 <DetailItem icon={GlassWater} label="Current Cycle Total Liters Used" value={customer.currentTotalLitersUsed ? `${customer.currentTotalLitersUsed.toFixed(2)} L` : 'N/A'} />
-
+                {customer.currentTotalHours !== undefined && (
+                    <DetailItem icon={Clock} label="Current Cycle Total Hours Used" value={customer.currentTotalHours ? `${customer.currentTotalHours.toFixed(2)} hrs` : 'N/A'} />
+                )}
                 {latestUsage ? (
                   <>
-                    <DetailItem icon={Hourglass} label="Last Reported Daily Hours" value={latestUsage.dailyHoursReported ? `${latestUsage.dailyHoursReported.toFixed(2)} hrs` : 'N/A'} />
-                    <DetailItem icon={GlassWater} label="Last Reported Daily Liters" value={latestUsage.dailyLitersUsed ? `${latestUsage.dailyLitersUsed.toFixed(2)} L` : 'N/A'} />
+                    <DetailItem icon={GlassWater} label="Last Reported Daily Liters" value={getDisplayDailyLiters()} />
+                    {latestUsage.dailyHoursReported !== undefined && (
+                        <DetailItem icon={Hourglass} label="Last Reported Daily Hours" value={latestUsage.dailyHoursReported ? `${latestUsage.dailyHoursReported.toFixed(2)} hrs` : 'N/A'} />
+                    )}
                     <DetailItem icon={CalendarDays} label="Timestamp of Last Report" value={latestUsage.timestamp} isDateTime className="md:col-span-2"/>
                   </>
                 ) : (

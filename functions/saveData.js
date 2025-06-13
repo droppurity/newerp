@@ -34,69 +34,90 @@ exports.handler = async (event, context) => {
   }
 
   const authHeader = event.headers.authorization;
-  if (!secretKey) { 
-    console.error('SAVE_DATA.JS: SERVER ERROR - SECRET_KEY is not set in Netlify environment variables.');
-    // Using temporary hardcoded key "1234" for fallback if SECRET_KEY env var is missing
-    if (!authHeader || authHeader !== `Bearer 1234`) {
-      console.warn('SAVE_DATA.JS: Unauthorized (env key missing, fallback check). Auth Header:', authHeader ? authHeader.substring(0,15) + '...' : 'NONE');
-      return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key (fallback).' }), headers: { 'Content-Type': 'application/json' } };
-    }
-     console.log('SAVE_DATA.JS: Authorization successful using fallback key "1234".');
-  } else {
-     // Primary check using SECRET_KEY from environment
-    if (!authHeader || authHeader !== `Bearer ${secretKey}`) {
-      console.warn('SAVE_DATA.JS: Unauthorized access attempt. Invalid or missing API key. Auth Header Received:', authHeader ? authHeader.substring(0,15) + '...' : 'NONE');
-      return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }), headers: { 'Content-Type': 'application/json' } };
-    }
-    console.log('SAVE_DATA.JS: Authorization successful using environment SECRET_KEY.');
+  const effectiveSecretKey = process.env.SECRET_KEY || "1234"; // Use env var, fallback to "1234"
+
+  if (!authHeader || authHeader !== `Bearer ${effectiveSecretKey}`) {
+    const logMsg = `SAVE_DATA.JS: Unauthorized access attempt. Invalid or missing API key. Auth Header Received: ${authHeader ? authHeader.substring(0,15) + '...' : 'NONE'}. Using key: ${process.env.SECRET_KEY ? 'env SECRET_KEY' : 'fallback "1234"'}`;
+    console.warn(logMsg);
+    return { statusCode: 401, body: JSON.stringify({ message: 'Unauthorized: Invalid or missing API key.' }), headers: { 'Content-Type': 'application/json' } };
   }
+  console.log('SAVE_DATA.JS: Authorization successful.');
 
 
   let data;
   try {
     data = JSON.parse(event.body);
-    console.log('SAVE_DATA.JS: Received data:', data);
+    console.log('SAVE_DATA.JS: Received data:', JSON.stringify(data));
   } catch (error) {
     console.error('SAVE_DATA.JS: Bad Request - Invalid JSON body.', error);
     return { statusCode: 400, body: JSON.stringify({ message: 'Bad Request: Invalid JSON body.' }), headers: { 'Content-Type': 'application/json' } };
   }
 
-  const { customerId, dailyHours, totalHours } = data; // ESP sends customerId (generatedId), dailyHours, totalHours
+  const { customerId, dailyHours, totalHours, dailyLiters, totalLiters } = data;
 
-  if (!customerId || typeof dailyHours !== 'number' || typeof totalHours !== 'number') {
-    console.warn('SAVE_DATA.JS: Bad Request - Missing or invalid customerId, dailyHours, or totalHours.', data);
-    return { statusCode: 400, body: JSON.stringify({ message: 'Bad Request: Missing or invalid customerId, dailyHours, or totalHours.' }), headers: { 'Content-Type': 'application/json' } };
+  // Validate core identifier
+  if (!customerId) {
+    console.warn('SAVE_DATA.JS: Bad Request - customerId is required.', data);
+    return { statusCode: 400, body: JSON.stringify({ message: 'Bad Request: customerId is required.' }), headers: { 'Content-Type': 'application/json' } };
   }
-  console.log('SAVE_DATA.JS: Processing for customerId:', customerId, 'dailyHours:', dailyHours, 'totalHours:', totalHours);
 
-  const dailyLitersUsed = parseFloat((dailyHours * 15).toFixed(2));
-  const totalLitersUsedInCycle = parseFloat((totalHours * 15).toFixed(2));
+  // Validate that we have either hours or liters, but not necessarily both.
+  const hasHourData = typeof dailyHours === 'number' && typeof totalHours === 'number';
+  const hasLiterData = typeof dailyLiters === 'number' && typeof totalLiters === 'number';
+
+  if (!hasHourData && !hasLiterData) {
+    console.warn('SAVE_DATA.JS: Bad Request - Missing or invalid usage data. Provide either (dailyHours, totalHours) or (dailyLiters, totalLiters).', data);
+    return { statusCode: 400, body: JSON.stringify({ message: 'Bad Request: Missing or invalid usage data. Provide either hour-based or liter-based readings.' }), headers: { 'Content-Type': 'application/json' } };
+  }
+
+  let finalDailyLitersUsed;
+  let finalTotalLitersUsedInCycle;
+  let usageEntry = { timestamp: new Date() };
+
+  if (hasLiterData) {
+    console.log(`SAVE_DATA.JS: Processing direct liter data for customerId: ${customerId}. DailyLiters: ${dailyLiters}, TotalLiters: ${totalLiters}`);
+    finalDailyLitersUsed = parseFloat(dailyLiters.toFixed(2));
+    finalTotalLitersUsedInCycle = parseFloat(totalLiters.toFixed(2));
+    usageEntry.dailyLitersReported = finalDailyLitersUsed;
+    usageEntry.totalLitersReportedInCycle = finalTotalLitersUsedInCycle;
+    if (hasHourData) { // If hours are also sent, log them
+        usageEntry.dailyHoursReported = parseFloat(dailyHours.toFixed(2));
+        usageEntry.totalHoursReported = parseFloat(totalHours.toFixed(2));
+    }
+  } else if (hasHourData) { // Only hour data is present, calculate liters
+    console.log(`SAVE_DATA.JS: Processing hour-based data for customerId: ${customerId}. DailyHours: ${dailyHours}, TotalHours: ${totalHours}. Calculating liters.`);
+    finalDailyLitersUsed = parseFloat((dailyHours * 15).toFixed(2));
+    finalTotalLitersUsedInCycle = parseFloat((totalHours * 15).toFixed(2));
+    usageEntry.dailyHoursReported = parseFloat(dailyHours.toFixed(2));
+    usageEntry.totalHoursReported = parseFloat(totalHours.toFixed(2));
+    usageEntry.dailyLitersCalculated = finalDailyLitersUsed; // Mark as calculated
+    usageEntry.totalLitersCalculatedInCycle = finalTotalLitersUsedInCycle; // Mark as calculated
+  }
+
 
   try {
     const db = await connectToDatabase();
     const customersCollection = db.collection('customers');
 
-    const newUsageEntry = {
-      timestamp: new Date(),
-      dailyHoursReported: dailyHours,
-      totalHoursReported: totalHours, 
-      dailyLitersUsed: dailyLitersUsed, // Calculated daily liters
-      totalLitersUsedInCycle: totalLitersUsedInCycle, // Calculated total liters for cycle
+    const updateSet = {
+      currentTotalLitersUsed: finalTotalLitersUsedInCycle,
+      lastContact: new Date(),
+      updatedAt: new Date()
     };
 
+    // Only update currentTotalHours if totalHours was provided by the ESP
+    if (typeof totalHours === 'number') {
+      updateSet.currentTotalHours = parseFloat(totalHours.toFixed(2));
+    }
+
     const result = await customersCollection.updateOne(
-      { generatedCustomerId: customerId }, 
+      { generatedCustomerId: customerId },
       {
-        $set: {
-          currentTotalHours: totalHours, 
-          currentTotalLitersUsed: totalLitersUsedInCycle, // Update total liters used in cycle
-          lastContact: new Date(),
-          updatedAt: new Date()
-        },
+        $set: updateSet,
         $push: {
           lastUsage: {
-            $each: [newUsageEntry],
-            $slice: -50 
+            $each: [usageEntry],
+            $slice: -50
           }
         }
       }
@@ -131,3 +152,4 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
